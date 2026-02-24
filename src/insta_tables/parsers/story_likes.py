@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from datetime import datetime
-from zoneinfo import ZoneInfo  # Python 3.9+
+from zoneinfo import ZoneInfo  # To change Timezone Info 
 
 
 def _rows_to_table(rows):
