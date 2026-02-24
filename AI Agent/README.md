@@ -1,4 +1,4 @@
-#DataScaffold: AI Multi-Agent System for Data Analysis 
+# DataScaffold: AI Multi-Agent System for Data Analysis 
 
 An AI-powered multi-agent system designed to scaffold students through the data analysis pipeline. Rather than providing direct answers, DataScaffold guides learners step-by-step from raw data to visualization to insight to actionable recommendations, building genuine data literacy along the way.
 
