@@ -4,7 +4,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "insta-tables"
+name = "social_media_parser"
 version = "0.1.0"
 description = "Extract tables from Instagram JSON exports for student projects"
 readme = "README.md"
