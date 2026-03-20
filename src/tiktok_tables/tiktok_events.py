@@ -1,5 +1,8 @@
 import json
 from pathlib import Path
+from datetime import datetime
+
+from datascience import Table
 
 from src.Tools.utils import tiktok_utc_string_to_timestamp, rows_to_table
 
@@ -7,10 +10,29 @@ DEFAULT_TZ = "America/New_York"
 COLUMNS = ["platform", "object_type", "action_type", "actor", "target", "value", "timestamp"]
 
 
+def add_basic_time_columns(t):
+    """
+    Adds 'hour', 'weekday', and 'date' columns using the existing 'timestamp' string.
+
+    Works even if the timestamp ends with EST/EDT by ignoring the last token.
+    Example timestamp: '2019-07-15 10:23:42 PM EDT'
+    """
+    def to_dt(ts):
+        # drop timezone token (EST/EDT/etc.)
+        ts_no_tz = " ".join(str(ts).split(" ")[:-1])
+        return datetime.strptime(ts_no_tz, "%Y-%m-%d %I:%M:%S %p")
+
+    t = t.with_column("timestamp_dt", t.apply(to_dt, "timestamp"))
+    t = t.with_column("hour", t.apply(lambda d: d.hour, "timestamp_dt"))
+    t = t.with_column("weekday", t.apply(lambda d: d.strftime("%A"), "timestamp_dt"))
+    t = t.with_column("date", t.apply(lambda d: d.date(), "timestamp_dt"))
+    return t
+
+
 def tiktok_events(json_path: str, tz: str = DEFAULT_TZ):
     """
     Parse TikTok user_data_tiktok.json into a single beginner-friendly events table with columns:
-    platform, object_type, action_type, actor, target, value, timestamp
+      platform, object_type, action_type, actor, target, value, timestamp
 
     Timezone changes: call again with a different tz, e.g. tz="America/Los_Angeles".
     """
@@ -95,4 +117,46 @@ def tiktok_events(json_path: str, tz: str = DEFAULT_TZ):
     # Sort by timestamp string (safe because it starts with YYYY-MM-DD)
     rows.sort(key=lambda r: r["timestamp"])
 
-    return rows_to_table(rows, columns=COLUMNS)
+    # Build base events table
+    t = rows_to_table(rows, columns=COLUMNS)
+
+    # Add hour/weekday/date automatically
+    t = add_basic_time_columns(t)
+
+    return t
+
+
+def tiktok_watch_summary(t):
+    """
+    Beginner-friendly TikTok-only summary.
+    Input: datascience.Table from tiktok_events(...)
+    Output: dict of small tables students can show/plot.
+    """
+    watch = t.where("action_type", "watch")
+
+    total = Table().with_columns(
+        "metric", ["total_watch_events"],
+        "value", [watch.num_rows]
+    )
+
+    if "hour" in watch.labels:
+        by_hour = watch.group("hour").sort("count", descending=True)
+    else:
+        by_hour = Table().with_columns("note", ["No 'hour' column yet."])
+
+    if "weekday" in watch.labels:
+        by_weekday = watch.group("weekday").sort("count", descending=True)
+    else:
+        by_weekday = Table().with_columns("note", ["No 'weekday' column yet."])
+
+    if "date" in watch.labels:
+        by_date = watch.group("date").sort("date")
+    else:
+        by_date = Table().with_columns("note", ["No 'date' column yet."])
+
+    return {
+        "total": total,
+        "by_hour": by_hour,
+        "by_weekday": by_weekday,
+        "by_date": by_date
+    }

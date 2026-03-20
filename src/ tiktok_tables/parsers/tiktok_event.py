@@ -80,3 +80,4 @@ def tiktok_events(json_path: str, tz: str = DEFAULT_TZ):
         add("video", "repost", it.get("Date") or it.get("date"), target=url)
 
     return rows_to_table(rows)
+
