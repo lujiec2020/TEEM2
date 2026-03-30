@@ -7,7 +7,7 @@ from datascience import Table
 from src.Tools.utils import tiktok_utc_string_to_timestamp, rows_to_table
 
 DEFAULT_TZ = "America/New_York"
-COLUMNS = ["platform", "object_type", "action_type", "actor", "target", "value", "timestamp"]
+COLUMNS = ["platform", "object_type", "action_type", "username", "target", "value", "timestamp"]
 
 
 def add_basic_time_columns(t):
@@ -17,6 +17,7 @@ def add_basic_time_columns(t):
     Works even if the timestamp ends with EST/EDT by ignoring the last token.
     Example timestamp: '2019-07-15 10:23:42 PM EDT'
     """
+
     def to_dt(ts):
         # drop timezone token (EST/EDT/etc.)
         ts_no_tz = " ".join(str(ts).split(" ")[:-1])
@@ -32,7 +33,7 @@ def add_basic_time_columns(t):
 def tiktok_events(json_path: str, tz: str = DEFAULT_TZ):
     """
     Parse TikTok user_data_tiktok.json into a single beginner-friendly events table with columns:
-      platform, object_type, action_type, actor, target, value, timestamp
+      platform, object_type, action_type, username, target, value, timestamp
 
     Timezone changes: call again with a different tz, e.g. tz="America/Los_Angeles".
     """
@@ -44,7 +45,7 @@ def tiktok_events(json_path: str, tz: str = DEFAULT_TZ):
         data = json.load(f)
 
     rows = []
-    actor = "self"
+    username = "self"
 
     def add(platform, object_type, action_type, ts_str, target="", value=""):
         if not ts_str:
@@ -59,7 +60,7 @@ def tiktok_events(json_path: str, tz: str = DEFAULT_TZ):
                 "platform": platform,
                 "object_type": object_type,
                 "action_type": action_type,
-                "actor": actor,
+                "username": username,
                 "target": target or "",
                 "value": value or "",
                 "timestamp": ts,
