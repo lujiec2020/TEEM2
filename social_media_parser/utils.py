@@ -13,6 +13,7 @@ EVENT_COLUMNS = [
     "timestamp_dt",
     "timestamp",
     "timestamp_unix",
+    "relative_day_index",  # Added for relative indexing
 ]
 
 
@@ -37,7 +38,6 @@ def unix_to_local_dt(unix_ts: int, tz: str = "America/New_York") -> datetime:
     ValueError
         If the timestamp cannot be converted to an integer.
     """
-    # Convert timestamp and apply timezone
     return datetime.fromtimestamp(int(unix_ts), pytz.timezone(tz))
 
 
@@ -77,8 +77,53 @@ def rows_to_table(rows: list) -> Table:
     """
     table = Table()
 
-    # Build table column-by-column using the predefined schema
     for col in EVENT_COLUMNS:
         table = table.with_column(col, [row.get(col, "") for row in rows])
 
     return table
+
+
+def index_by_active_day(rows: list) -> list:
+    """
+    Add a relative day index to each event based only on days with activity.
+
+    The first day with any activity is assigned index 1, the next active day
+    is index 2, and so on. Days with no activity are skipped.
+
+    Parameters
+    ----------
+    rows : list of dict
+        List of event records. Each record must contain 'timestamp_unix'.
+
+    Returns
+    -------
+    list of dict
+        Updated rows with an added 'relative_day_index' field.
+    """
+
+    if not rows:
+        return rows
+
+    # Step 1: Extract date from timestamp
+    for row in rows:
+        unix_ts = row.get("timestamp_unix")
+        if unix_ts:
+            row["_date"] = datetime.fromtimestamp(int(unix_ts)).date()
+        else:
+            row["_date"] = None
+
+    # Step 2: Get unique active dates (skip missing)
+    unique_dates = sorted({row["_date"] for row in rows if row["_date"] is not None})
+
+    # Step 3: Create mapping (date → index)
+    date_to_index = {date: idx + 1 for idx, date in enumerate(unique_dates)}
+
+    # Step 4: Assign index back to rows
+    for row in rows:
+        date = row.get("_date")
+        row["relative_day_index"] = date_to_index.get(date, "")
+
+        # Clean up temporary field
+        del row["_date"]
+
+    return rows

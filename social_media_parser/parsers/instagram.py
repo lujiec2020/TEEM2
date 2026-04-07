@@ -1,7 +1,12 @@
 import json
 from pathlib import Path
 
-from social_media_parser.utils import rows_to_table, unix_to_local_dt, format_timestamp
+from social_media_parser.utils import (
+    rows_to_table,
+    unix_to_local_dt,
+    format_timestamp,
+    index_by_active_day,  # 👈 NEW IMPORT
+)
 from social_media_parser.time_features import EventTable
 
 
@@ -12,27 +17,7 @@ def parse_instagram(path: str = ".", tz: str = "America/New_York") -> EventTable
     This function scans a directory (and its subdirectories) for Instagram
     JSON export files and extracts structured activity such as story likes,
     poll responses, and comments on posts and reels.
-
-    Parameters
-    ----------
-    path : str, optional
-        Path to the folder containing Instagram JSON files (default is current directory).
-    tz : str, optional
-        Timezone used to convert Unix timestamps into human-readable datetime values
-        (default is "America/New_York").
-
-    Returns
-    -------
-    EventTable
-        A structured table containing Instagram activity with standardized fields:
-        object_type, action_type, username, target, value, and timestamps.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the provided folder path does not exist or is not a directory.
     """
-    # Convert input path string to a Path object for easier file handling
     folder = Path(path)
 
     if not folder.exists() or not folder.is_dir():
@@ -42,21 +27,16 @@ def parse_instagram(path: str = ".", tz: str = "America/New_York") -> EventTable
         )
 
     rows = []
-
-    # Recursively find all JSON files in the folder
     json_files = sorted(folder.rglob("*.json"))
 
-    # Return empty table if no files are found
     if not json_files:
         return EventTable(rows_to_table([]))
 
-    # Process each JSON file individually
     for fp in json_files:
         try:
             with open(fp, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception:
-            # Skip files that cannot be read or parsed
             continue
 
         # ---------------------------
@@ -64,7 +44,6 @@ def parse_instagram(path: str = ".", tz: str = "America/New_York") -> EventTable
         # ---------------------------
         if isinstance(data, dict):
 
-            # Story likes
             if "story_activities_story_likes" in data:
                 items = data.get("story_activities_story_likes", []) or []
 
@@ -73,7 +52,6 @@ def parse_instagram(path: str = ".", tz: str = "America/New_York") -> EventTable
 
                     for entry in item.get("string_list_data", []) or []:
                         unix_ts = entry.get("timestamp")
-
                         if unix_ts is None:
                             continue
 
@@ -95,7 +73,6 @@ def parse_instagram(path: str = ".", tz: str = "America/New_York") -> EventTable
                             "timestamp_unix": unix_ts,
                         })
 
-            # Story poll responses
             if "story_activities_polls" in data:
                 items = data.get("story_activities_polls", []) or []
 
@@ -104,7 +81,6 @@ def parse_instagram(path: str = ".", tz: str = "America/New_York") -> EventTable
 
                     for entry in item.get("string_list_data", []) or []:
                         unix_ts = entry.get("timestamp")
-
                         if unix_ts is None:
                             continue
 
@@ -195,7 +171,6 @@ def parse_instagram(path: str = ".", tz: str = "America/New_York") -> EventTable
                 except (TypeError, ValueError):
                     continue
 
-                # Extract media target (e.g., post image/video URI)
                 target = ""
                 if media_list and isinstance(media_list[0], dict):
                     target = media_list[0].get("uri", "") or ""
@@ -212,6 +187,10 @@ def parse_instagram(path: str = ".", tz: str = "America/New_York") -> EventTable
                     "timestamp": format_timestamp(dt_local),
                     "timestamp_unix": unix_ts,
                 })
+    # Sort chronologically (oldest → newest)
+    rows.sort(key=lambda r: r["timestamp_unix"])
+    # Add relative day indexing
+    rows = index_by_active_day(rows)
 
     return EventTable(rows_to_table(rows))
 
