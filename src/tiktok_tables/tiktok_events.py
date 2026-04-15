@@ -1,32 +1,102 @@
 import json
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from datascience import Table
 
 from src.Tools.utils import tiktok_utc_string_to_timestamp, rows_to_table
 
 DEFAULT_TZ = "America/New_York"
-
-# Use username to stay consistent with your merged/instagram schema
 COLUMNS = ["platform", "object_type", "action_type", "username", "target", "value", "timestamp"]
 
 
 # -------------------------
-# Time feature helpers
+# Beginner-friendly errors
+# -------------------------
+
+class StudentInputError(Exception):
+    """Friendly error for student mistakes (bad path, bad dates, etc.)."""
+    pass
+
+
+def _raise(msg: str):
+    raise StudentInputError("⚠️ " + msg)
+
+
+# -------------------------
+# Date parsing + range filter
+# -------------------------
+
+def _parse_user_date(s: str) -> date:
+    """
+    Accepts:
+      - "12-16-2025" or "1-8-2026" (MM-DD-YYYY, M-D-YYYY)
+      - "2025-12-16" (YYYY-MM-DD)
+      - "12/16/2025" (MM/DD/YYYY)
+    """
+    s = str(s).strip()
+    fmts = ["%m-%d-%Y", "%Y-%m-%d", "%m/%d/%Y"]
+    for fmt in fmts:
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            pass
+
+    _raise(
+        "Invalid date format.\n"
+        "Fix: use 'MM-DD-YYYY' (example: '12-16-2025') or 'YYYY-MM-DD' (example: '2025-12-16')."
+    )
+
+
+def filter_by_date_range(t: Table, start_date=None, end_date=None) -> Table:
+    """Filter rows by date range using the existing 'date' column."""
+    if start_date is None and end_date is None:
+        return t
+
+    if "date" not in t.labels:
+        _raise(
+            "This table has no 'date' column.\n"
+            "Fix: make sure you built the table using tiktok_events(...) (it adds date/hour automatically)."
+        )
+
+    start_d = _parse_user_date(start_date) if start_date is not None else None
+    end_d = _parse_user_date(end_date) if end_date is not None else None
+
+    if start_d and end_d and end_d < start_d:
+        _raise(
+            "end_date must be the same as or after start_date.\n"
+            "Fix: check the year (example: Dec 2025 to Jan 2026 should end_date='1-8-2026')."
+        )
+
+    if start_d is not None:
+        t = t.where("date", lambda d: d is not None and d >= start_d)
+    if end_d is not None:
+        t = t.where("date", lambda d: d is not None and d <= end_d)
+
+    return t
+
+
+# -------------------------
+# Time features
 # -------------------------
 
 def add_basic_time_columns(t: Table) -> Table:
     """
     Adds: timestamp_dt, hour, weekday, date
 
-    Works even if timestamp ends with EST/EDT by ignoring the last token.
-    Example: '2019-07-15 10:23:42 PM EDT'
+    Expects timestamp like:
+      'YYYY-MM-DD HH:MM:SS AM/PM EDT'
     """
     def to_dt(ts):
-        # drop timezone token (EST/EDT/etc.)
-        ts_no_tz = " ".join(str(ts).split(" ")[:-1])
-        return datetime.strptime(ts_no_tz, "%Y-%m-%d %I:%M:%S %p")
+        try:
+            ts_no_tz = " ".join(str(ts).split(" ")[:-1])  # drop EST/EDT token
+            return datetime.strptime(ts_no_tz, "%Y-%m-%d %I:%M:%S %p")
+        except Exception:
+            _raise(
+                "Could not parse a timestamp into a datetime.\n"
+                "Fix: make sure your 'timestamp' column looks like '2019-07-15 10:23:42 PM EDT'.\n"
+                "Tip: Restart Kernel after editing .py files."
+            )
 
     t = t.with_column("timestamp_dt", t.apply(to_dt, "timestamp"))
     t = t.with_column("hour", t.apply(lambda d: d.hour if d else None, "timestamp_dt"))
@@ -35,55 +105,38 @@ def add_basic_time_columns(t: Table) -> Table:
     return t
 
 
-def _filter_window_by_latest_date(t: Table, window: str | None) -> Table:
-    """
-    Filter by a time window relative to the latest date in the dataset.
-    window options: None or "all", "1_week", "1_month", "3_month", "6_month", "1_year"
-    """
-    if window is None or str(window).lower() in ("all", ""):
-        return t
-
-    days_map = {
-        "1_week": 7,
-        "1_month": 30,
-        "3_month": 90,
-        "6_month": 180,
-        "1_year": 365,
-    }
-    window = str(window).lower().strip()
-    if window not in days_map:
-        raise ValueError(f"Invalid window '{window}'. Use one of: {list(days_map.keys())} or 'all'.")
-
-    if "date" not in t.labels:
-        t = add_basic_time_columns(t)
-
-    dates = [d for d in t.column("date") if d is not None]
-    if not dates:
-        return t
-
-    latest = max(dates)
-    cutoff = latest - timedelta(days=days_map[window])
-    return t.where("date", lambda d: d is not None and d >= cutoff)
-
-
 # -------------------------
 # Main TikTok parser
 # -------------------------
 
-def tiktok_events(json_path: str, tz: str = DEFAULT_TZ) -> Table:
+def tiktok_events(
+    json_path: str,
+    tz: str = DEFAULT_TZ,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> Table:
     """
-    Parse TikTok user_data_tiktok.json into a beginner-friendly events Table with columns:
-      platform, object_type, action_type, username, target, value, timestamp
+    Parse TikTok user_data_tiktok.json into a beginner-friendly events Table.
 
-    Also auto-adds:
-      timestamp_dt, hour, weekday, date
+    Optional date filtering:
+      start_date="12-16-2025", end_date="1-8-2026"
     """
     path = Path(json_path)
     if not path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
+        _raise(
+            f"File not found: {path}\n"
+            "Fix: put your TikTok file in the data/ folder and call:\n"
+            "  tiktok_events('data/user_data_tiktok.json')"
+        )
 
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        _raise(
+            "Could not read your TikTok JSON file.\n"
+            "Fix: make sure it is a valid JSON export (not HTML) and it is not corrupted."
+        )
 
     rows = []
     username = "self"
@@ -94,7 +147,11 @@ def tiktok_events(json_path: str, tz: str = DEFAULT_TZ) -> Table:
         try:
             ts = tiktok_utc_string_to_timestamp(ts_str, tz)
         except Exception:
-            return
+            # If timezone string is wrong, students should see a helpful message
+            _raise(
+                f"Could not convert timestamp using timezone '{tz}'.\n"
+                "Fix: try tz='America/New_York' (EST) or tz='America/Los_Angeles' (PST)."
+            )
 
         rows.append(
             {
@@ -111,24 +168,14 @@ def tiktok_events(json_path: str, tz: str = DEFAULT_TZ) -> Table:
     # WATCH HISTORY
     watch = data.get("Your Activity", {}).get("Watch History", {}).get("VideoList", []) or []
     for it in watch:
-        add(
-            "tiktok",
-            "video",
-            "watch",
-            it.get("Date"),
-            target=(it.get("Link") or it.get("link") or it.get("url") or ""),
-        )
+        add("tiktok", "video", "watch", it.get("Date"),
+            target=(it.get("Link") or it.get("link") or it.get("url") or ""))
 
     # LIKES
     likes = data.get("Likes and Favorites", {}).get("Like List", {}).get("ItemFavoriteList", []) or []
     for it in likes:
-        add(
-            "tiktok",
-            "video",
-            "like",
-            it.get("date") or it.get("Date"),
-            target=(it.get("link") or it.get("Link") or it.get("url") or ""),
-        )
+        add("tiktok", "video", "like", it.get("date") or it.get("Date"),
+            target=(it.get("link") or it.get("Link") or it.get("url") or ""))
 
     # SEARCHES
     searches = data.get("Your Activity", {}).get("Searches", {}).get("SearchList", []) or []
@@ -156,27 +203,19 @@ def tiktok_events(json_path: str, tz: str = DEFAULT_TZ) -> Table:
         url = it.get("url") or it.get("Link") or it.get("link") or ""
         add("tiktok", "video", "repost", it.get("Date") or it.get("date"), target=url)
 
-    # Sort by timestamp string (safe because it starts with YYYY-MM-DD)
     rows.sort(key=lambda r: r["timestamp"])
 
-    # Build base events table
     t = rows_to_table(rows, columns=COLUMNS)
-
-    # Add hour/weekday/date automatically
     t = add_basic_time_columns(t)
-
+    t = filter_by_date_range(t, start_date=start_date, end_date=end_date)
     return t
 
 
 # -------------------------
-# Existing summary function
+# Summaries / indicators
 # -------------------------
 
 def tiktok_watch_summary(t: Table):
-    """
-    Beginner-friendly TikTok-only watch summary.
-    Returns dict of small Tables students can .show()
-    """
     watch = t.where("action_type", "watch")
 
     total = Table().with_columns(
@@ -196,34 +235,19 @@ def tiktok_watch_summary(t: Table):
     return {"total": total, "by_hour": by_hour, "by_weekday": by_weekday, "by_date": by_date}
 
 
-# -------------------------
-# NEW: Late-night binge scrolling
-# -------------------------
-
 def tiktok_late_night_binge(
     t: Table,
     start_hour: int = 23,
     end_hour: int = 4,
-    window: str | None = "all",
+    start_date: str | None = None,
+    end_date: str | None = None,
 ):
-    """
-    Late-night binge scrolling indicator (TikTok-only).
-    Counts watch events occurring late night.
-
-    Default window: all data (same as import)
-    Default late-night window: 11PM–4AM
-      - hours >= 23 OR hours <= 4
-
-    Returns:
-      dict with summary table + by_date table
-    """
-    t2 = _filter_window_by_latest_date(t, window)
+    t2 = filter_by_date_range(t, start_date=start_date, end_date=end_date)
     watch = t2.where("action_type", "watch")
 
     if watch.num_rows == 0:
         return {"summary": Table().with_columns("note", ["No watch events found."])}
 
-    # Late-night mask (wrap around midnight)
     late = watch.where("hour", lambda h: (h is not None) and (h >= start_hour or h <= end_hour))
 
     total_watch = watch.num_rows
@@ -232,10 +256,10 @@ def tiktok_late_night_binge(
 
     summary = Table().with_columns(
         "metric",
-        ["window", "late_hours", "total_watch_events", "late_night_watch_events", "late_night_share"],
+        ["date_range", "late_hours", "total_watch_events", "late_night_watch_events", "late_night_share"],
         "value",
         [
-            str(window),
+            f"{start_date or 'ALL'} to {end_date or 'ALL'}",
             f"{start_hour}:00–{end_hour}:59 (wrap)",
             total_watch,
             late_watch,
@@ -243,61 +267,40 @@ def tiktok_late_night_binge(
         ],
     )
 
-    by_date = late.group("date").sort("date") if late.num_rows else Table().with_columns("note", ["No late-night watch events."])
+    late_by_date = late.group("date").sort("date") if late.num_rows else \
+        Table().with_columns("note", ["No late-night watch events."])
 
-    return {"summary": summary, "late_by_date": by_date}
+    return {"summary": summary, "late_by_date": late_by_date}
 
-
-# -------------------------
-# NEW: Doomscroll indicator
-# -------------------------
 
 def tiktok_doomscroll_indicator(
     t: Table,
-    window: str | None = "all",
+    start_date: str | None = None,
+    end_date: str | None = None,
     late_start: int = 23,
     late_end: int = 4,
     session_gap_minutes: int = 20,
     top_n_days: int = 10,
 ):
-    """
-    Doomscroll indicator (TikTok-only):
-    Flags heavy days by combining:
-      - high watch volume (events per day)
-      - late-night share
-      - long sessions (approx) using gap threshold
-
-    Works with beginner-friendly outputs.
-
-    Returns dict:
-      - summary (overall)
-      - day_scores (top days)
-    """
-    t2 = _filter_window_by_latest_date(t, window)
+    t2 = filter_by_date_range(t, start_date=start_date, end_date=end_date)
     watch = t2.where("action_type", "watch")
 
     if watch.num_rows == 0:
         return {"summary": Table().with_columns("note", ["No watch events found."])}
 
-    # Ensure timestamp_dt exists (it does from add_basic_time_columns)
     if "timestamp_dt" not in watch.labels:
         watch = add_basic_time_columns(watch)
 
-    # Build per-day counts
     by_day = watch.group("date").sort("count", descending=True)
 
-    # Helper: late-night events per day
     late = watch.where("hour", lambda h: (h is not None) and (h >= late_start or h <= late_end))
     late_by_day = late.group("date") if late.num_rows else Table().with_columns("date", [], "count", [])
 
-    # Build a lookup dict for late counts
     late_map = {}
     if late_by_day.num_rows:
         for d, c in zip(late_by_day.column("date"), late_by_day.column("count")):
             late_map[d] = c
 
-    # Approx session count per day using time gaps
-    # Session count = 1 + number of gaps > session_gap_minutes
     gap_seconds = session_gap_minutes * 60
 
     def session_count_for_date(day):
@@ -307,12 +310,10 @@ def tiktok_doomscroll_indicator(
             return 0
         sessions = 1
         for i in range(1, len(dts)):
-            if (dts[i] - dts[i-1]).total_seconds() > gap_seconds:
+            if (dts[i] - dts[i - 1]).total_seconds() > gap_seconds:
                 sessions += 1
         return sessions
 
-    # Compute day-level doom score
-    # score = watches + 2*(late_night_watches) + 10*(sessions>=3) as a simple heuristic
     dates = list(by_day.column("date"))
     counts = list(by_day.column("count"))
 
@@ -320,18 +321,15 @@ def tiktok_doomscroll_indicator(
     for d, cnt in zip(dates, counts):
         late_cnt = late_map.get(d, 0)
         sessions = session_count_for_date(d)
-
         score = cnt + 2 * late_cnt + (10 if sessions >= 3 else 0)
 
-        rows.append(
-            {
-                "date": d,
-                "watch_events": cnt,
-                "late_night_watch_events": late_cnt,
-                "sessions_est": sessions,
-                "doomscroll_score": score,
-            }
-        )
+        rows.append({
+            "date": d,
+            "watch_events": cnt,
+            "late_night_watch_events": late_cnt,
+            "sessions_est": sessions,
+            "doomscroll_score": score,
+        })
 
     day_scores = Table().with_columns(
         "date", [r["date"] for r in rows],
@@ -341,15 +339,14 @@ def tiktok_doomscroll_indicator(
         "doomscroll_score", [r["doomscroll_score"] for r in rows],
     ).sort("doomscroll_score", descending=True)
 
-    # top days
     top_days = day_scores.take(range(min(top_n_days, day_scores.num_rows))) if day_scores.num_rows else day_scores
 
-    overall = Table().with_columns(
+    summary = Table().with_columns(
         "metric",
-        ["window", "total_watch_events", "unique_watch_days", "session_gap_minutes", "late_hours"],
+        ["date_range", "total_watch_events", "unique_watch_days", "session_gap_minutes", "late_hours"],
         "value",
         [
-            str(window),
+            f"{start_date or 'ALL'} to {end_date or 'ALL'}",
             watch.num_rows,
             len(set(watch.column("date"))),
             session_gap_minutes,
@@ -357,4 +354,4 @@ def tiktok_doomscroll_indicator(
         ],
     )
 
-    return {"summary": overall, "day_scores": top_days}
+    return {"summary": summary, "day_scores": top_days}
