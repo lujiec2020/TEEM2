@@ -1,22 +1,9 @@
-from pathlib import Path
 from datascience import Table
 
 from social_media_parser.parsers.instagram import instagram_events
 from src.tiktok_tables.tiktok_events import tiktok_events
 
 FINAL_COLS = ["platform", "object_type", "action_type", "username", "target", "value", "timestamp"]
-
-
-# -------------------------
-# Beginner-friendly errors
-# -------------------------
-
-class StudentInputError(Exception):
-    pass
-
-
-def _raise(msg: str):
-    raise StudentInputError("⚠️ " + msg)
 
 
 def _ensure_column(t: Table, col: str, default=""):
@@ -28,11 +15,9 @@ def _ensure_column(t: Table, col: str, default=""):
 def _to_final_schema(t: Table, platform_name: str) -> Table:
     t = _ensure_column(t, "platform", platform_name)
 
-    # support old TikTok actor name if it ever appears
-    if "actor" in t.labels and "username" not in t.labels:
-        t = t.relabel("actor", "username")
-
+    # Instagram already uses username; TikTok uses username too (now)
     t = _ensure_column(t, "username", "")
+
     for c in ["object_type", "action_type", "target", "value", "timestamp"]:
         t = _ensure_column(t, c, "")
 
@@ -47,53 +32,73 @@ def social_media_events(
     end_date: str | None = None,
 ) -> Table:
     """
-    Combined Instagram + TikTok in one Table (final schema).
+    One-call function:
+      - reads Instagram takeout folder
+      - reads TikTok user_data_tiktok.json
+      - returns ONE combined Table in a consistent schema
 
-    Optional date range:
+    Optional date range filter:
       start_date="12-16-2025", end_date="1-8-2026"
     """
-    ig_path = Path(instagram_folder)
-    tk_path = Path(tiktok_json)
-
-    if not ig_path.exists() or not ig_path.is_dir():
-        _raise(
-            f"Instagram folder not found: {ig_path}\n"
-            "Fix: pass the folder containing Instagram JSON files (example: 'data')."
-        )
-
-    if not tk_path.exists():
-        _raise(
-            f"TikTok JSON not found: {tk_path}\n"
-            "Fix: put your TikTok file in data/ and call:\n"
-            "  social_media_events('data', 'data/user_data_tiktok.json')"
-        )
-
-    try:
-        insta = instagram_events(instagram_folder, tz=tz, start_date=start_date, end_date=end_date).table
-    except Exception as e:
-        _raise(
-            "Instagram parsing failed.\n"
-            f"Fix: check your Instagram export files in '{instagram_folder}'.\n"
-            f"Details: {e}"
-        )
-
-    try:
-        tik = tiktok_events(tiktok_json, tz=tz, start_date=start_date, end_date=end_date)
-    except Exception as e:
-        _raise(
-            "TikTok parsing failed.\n"
-            f"Fix: check your TikTok file path and date format.\n"
-            f"Details: {e}"
-        )
+    insta = instagram_events(instagram_folder, tz=tz, start_date=start_date, end_date=end_date).table
+    tiktok = tiktok_events(tiktok_json, tz=tz, start_date=start_date, end_date=end_date)
 
     insta_final = _to_final_schema(insta, "instagram")
-    tik_final = _to_final_schema(tik, "tiktok")
+    tiktok_final = _to_final_schema(tiktok, "tiktok")
 
-    combined = insta_final.append(tik_final)
+    combined = insta_final.append(tiktok_final)
 
-    try:
-        combined = combined.sort("timestamp")
-    except Exception:
-        pass
+    if "timestamp" in combined.labels:
+        try:
+            combined = combined.sort("timestamp")
+        except Exception:
+            pass
 
     return combined
+
+
+# -------------------------
+# Quick time group helpers
+# -------------------------
+
+from datetime import datetime
+
+
+def _parse_timestamp_to_dt(ts: str):
+    if ts is None:
+        return None
+    ts = str(ts).strip()
+    parts = ts.split(" ")
+    if len(parts) < 3:
+        return None
+    ts_no_tz = " ".join(parts[:-1])
+    try:
+        return datetime.strptime(ts_no_tz, "%Y-%m-%d %I:%M:%S %p")
+    except Exception:
+        return None
+
+
+def add_basic_time_columns(t: Table) -> Table:
+    t = t.with_column("timestamp_dt", t.apply(_parse_timestamp_to_dt, "timestamp"))
+    t = t.with_column("hour", t.apply(lambda d: d.hour if d else None, "timestamp_dt"))
+    t = t.with_column("weekday", t.apply(lambda d: d.strftime("%A") if d else None, "timestamp_dt"))
+    t = t.with_column("date", t.apply(lambda d: d.date() if d else None, "timestamp_dt"))
+    return t
+
+
+def events_by_hour(t: Table) -> Table:
+    if "hour" not in t.labels:
+        t = add_basic_time_columns(t)
+    return t.group("hour").sort("count", descending=True)
+
+
+def events_by_weekday(t: Table) -> Table:
+    if "weekday" not in t.labels:
+        t = add_basic_time_columns(t)
+    return t.group("weekday").sort("count", descending=True)
+
+
+def events_by_date(t: Table) -> Table:
+    if "date" not in t.labels:
+        t = add_basic_time_columns(t)
+    return t.group("date").sort("date")
