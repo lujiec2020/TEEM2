@@ -509,5 +509,46 @@ def tiktok_doomscroll_indicator(
     dates = list(by_day.column("date"))
     counts = list(by_day.column("count"))
 
-    rows = []
+        rows = []
     for d, cnt in zip(dates, counts):
+        late_cnt = late_map.get(d, 0)
+        sessions = session_count_for_date(d)
+        score = cnt + 2 * late_cnt + (10 if sessions >= 3 else 0)
+
+        rows.append((d, cnt, late_cnt, sessions, score))
+
+    day_scores = Table().with_columns(
+        "date", [r[0] for r in rows],
+        "watch_events", [r[1] for r in rows],
+        "late_night_watch_events", [r[2] for r in rows],
+        "sessions_est", [r[3] for r in rows],
+        "doomscroll_score", [r[4] for r in rows],
+    ).sort("doomscroll_score", descending=True)
+
+    top_days = (
+        day_scores.take(range(min(top_n_days, day_scores.num_rows)))
+        if day_scores.num_rows
+        else day_scores
+    )
+
+    overall = Table().with_columns(
+        "metric",
+        [
+            "date_range",
+            "total_watch_events",
+            "unique_watch_days",
+            "session_gap_minutes",
+            "late_hours",
+        ],
+        "value",
+        [
+            f"{start_date} to {end_date}" if (start_date or end_date) else "all_time",
+            watch.num_rows,
+            len(set(watch.column("date"))),
+            session_gap_minutes,
+            f"{late_start}:00–{late_end}:59 (wrap)",
+        ],
+    )
+
+    return {"summary": overall, "day_scores": top_days}
+
