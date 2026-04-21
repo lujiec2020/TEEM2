@@ -1,3 +1,15 @@
+"""
+Instagram parser for social media event analysis.
+
+This module:
+- Parses Instagram JSON export files (story likes, polls, reel comments, post comments).
+- Converts timestamps to local timezone.
+- Provides date filtering and reindexing utilities.
+- Returns results as an EventTable for downstream analysis.
+
+All functions are beginner-friendly and designed for use in data science courses.
+"""
+
 import json
 from pathlib import Path
 from datetime import datetime, date
@@ -6,9 +18,9 @@ from social_media_parser.utils import rows_to_table, unix_to_local_dt, format_ti
 from social_media_parser.time_features import EventTable
 
 
-# -------------------------
+# ============================================================
 # Beginner-friendly errors
-# -------------------------
+# ============================================================
 
 class StudentInputError(Exception):
     """Friendly error for student mistakes (bad folder, bad dates, etc.)."""
@@ -16,20 +28,39 @@ class StudentInputError(Exception):
 
 
 def _raise(msg: str):
+    """Raise a StudentInputError with a consistent prefix."""
     raise StudentInputError("Error: " + msg)
 
 
-# -------------------------
+# ============================================================
 # Date parsing + filtering
-# -------------------------
+# ============================================================
 
 def _parse_user_date(s: str) -> date:
     """
-    Accepts:
-      - "12-16-2025" or "1-8-2026" (MM-DD-YYYY / M-D-YYYY)
-      - "2025-12-16" (YYYY-MM-DD)
-      - "12/16/2025" (MM/DD/YYYY)
-    Returns a datetime.date.
+    Convert a user-provided date string into a `datetime.date`.
+
+    Accepted formats
+    ----------------
+    - ``MM-DD-YYYY``  (e.g., ``12-16-2025``)
+    - ``M-D-YYYY``    (e.g., ``1-8-2026``)
+    - ``YYYY-MM-DD``  (e.g., ``2025-12-16``)
+    - ``MM/DD/YYYY``  (e.g., ``12/16/2025``)
+
+    Parameters
+    ----------
+    s : str
+        A date string provided by the student.
+
+    Returns
+    -------
+    datetime.date
+        Parsed date object.
+
+    Raises
+    ------
+    StudentInputError
+        If the date format is invalid.
     """
     if s is None:
         return None
@@ -51,16 +82,34 @@ def _parse_user_date(s: str) -> date:
 
 def filter_by_date_range(table, start_date=None, end_date=None):
     """
-    Filters a datascience.Table by date range using timestamp_dt.
-    start_date/end_date can be None.
+    Filter an Instagram events table by date range.
+
+    Parameters
+    ----------
+    table : datascience.Table
+        Table containing a ``timestamp_dt`` column.
+    start_date : str or None
+        Start of the date range.
+    end_date : str or None
+        End of the date range.
+
+    Returns
+    -------
+    datascience.Table
+        Filtered table containing only rows within the date range.
+
+    Notes
+    -----
+    - If both dates are ``None``, the table is returned unchanged.
+    - If ``timestamp_dt`` is missing, the table is returned unchanged.
     """
     if start_date is None and end_date is None:
         return table
 
-    start_d = _parse_user_date(start_date) if start_date is not None else None
-    end_d = _parse_user_date(end_date) if end_date is not None else None
+    start_d = _parse_user_date(start_date) if start_date else None
+    end_d = _parse_user_date(end_date) if end_date else None
 
-    if start_d is not None and end_d is not None and end_d < start_d:
+    if start_d and end_d and end_d < start_d:
         _raise(
             "end_date must be the same as or after start_date.\n"
             "Fix: check the year (example: Dec 2025 to Jan 2026 should end_date='1-8-2026')."
@@ -69,29 +118,52 @@ def filter_by_date_range(table, start_date=None, end_date=None):
     if "timestamp_dt" not in table.labels:
         return table
 
-    # create date column for filtering
     t = table.with_column("date", table.apply(lambda dt: dt.date() if dt else None, "timestamp_dt"))
 
-    if start_d is not None:
+    if start_d:
         t = t.where("date", lambda d: d is not None and d >= start_d)
-    if end_d is not None:
+    if end_d:
         t = t.where("date", lambda d: d is not None and d <= end_d)
 
     return t
 
 
-# -------------------------
-# NEW: Reindex Instagram by date range
-# -------------------------
+# ============================================================
+# Reindexing helper
+# ============================================================
 
 def reindex_instagram_by_date_range(t, start_str: str, end_str: str):
     """
-    Reindex Instagram events within a date range using 1, 2, 3, ...
-    Date format: 'MM-DD-YYYY' (also accepts YYYY-MM-DD and MM/DD/YYYY).
-    Works on EventTable or raw datascience.Table.
-    """
+    Reindex Instagram events within a date range using sequential integers.
 
-    # Convert user input to date objects
+    The first event in the range receives index 1, the next 2, and so on.
+
+    Parameters
+    ----------
+    t : EventTable or datascience.Table
+        Instagram event table or its underlying datascience.Table.
+    start_str : str
+        Start date (any accepted user format).
+    end_str : str
+        End date (any accepted user format).
+
+    Returns
+    -------
+    datascience.Table
+        Filtered table with a new column ``relative_range_index``.
+
+    Raises
+    ------
+    StudentInputError
+        If the date range is invalid.
+
+    Examples
+    --------
+    >>> ig = parse_instagram("data")
+    >>> subset = reindex_instagram_by_date_range(ig, "01-10-2024", "01-20-2024")
+    >>> subset.labels
+    ['object_type', 'action_type', ..., 'relative_range_index']
+    """
     start_date = _parse_user_date(start_str)
     end_date = _parse_user_date(end_str)
 
@@ -101,42 +173,27 @@ def reindex_instagram_by_date_range(t, start_str: str, end_str: str):
             "Fix: check the year (example: Dec 2025 to Jan 2026 should end_date='1-8-2026')."
         )
 
-    # If user passed an EventTable, extract the underlying table
-    if hasattr(t, "table"):
-        base = t.table
-    else:
-        base = t
+    base = t.table if hasattr(t, "table") else t
 
-    # Ensure timestamp_dt exists
     if "timestamp_dt" not in base.labels:
         _raise("Instagram table is missing 'timestamp_dt'. This should never happen unless the parser failed.")
 
-    # Add a date column for filtering
-    base = base.with_column(
-        "date",
-        base.apply(lambda dt: dt.date() if dt else None, "timestamp_dt")
-    )
+    base = base.with_column("date", base.apply(lambda dt: dt.date() if dt else None, "timestamp_dt"))
 
-    # Filter rows inside the date range
-    filtered = base.where(
-        "date",
-        lambda d: d is not None and start_date <= d <= end_date
-    )
+    filtered = base.where("date", lambda d: d is not None and start_date <= d <= end_date)
 
-    # If no rows, return empty table
     if filtered.num_rows == 0:
         return filtered
 
-    # Add sequential index column
     new_index = list(range(1, filtered.num_rows + 1))
     filtered = filtered.with_column("relative_range_index", new_index)
 
     return filtered
 
 
-# -------------------------
-# Main parser
-# -------------------------
+# ============================================================
+# Main Instagram parser
+# ============================================================
 
 def parse_instagram(
     path: str = ".",
@@ -147,24 +204,43 @@ def parse_instagram(
     """
     Parse Instagram export data into a unified event table.
 
+    Supported data types:
+    - Story likes
+    - Story poll responses
+    - Reel comments
+    - Post comments
+
     Parameters
     ----------
     path : str
         Folder containing Instagram JSON export files.
     tz : str
         Timezone for timestamp conversion.
-    start_date / end_date : str | None
-        Optional date range filter.
+    start_date : str or None
+        Optional start date filter.
+    end_date : str or None
+        Optional end date filter.
+
+    Returns
+    -------
+    EventTable
+        Parsed Instagram events with standardized columns.
+
+    Examples
+    --------
+    >>> ig = parse_instagram("data/instagram")
+    >>> ig.table.num_rows
+    482
     """
     if path is None or str(path).strip() == "":
-        _raise("Instagram folder path is empty. Fix: pass a folder like 'data' (or '.' for current folder).")
+        _raise("Instagram folder path is empty. Fix: pass a folder like 'data'.")
 
     folder = Path(path)
 
     if not folder.exists() or not folder.is_dir():
         _raise(
             f"Folder not found: {folder}\n"
-            "Fix: pass the folder containing your downloaded Instagram JSON files (example: 'data')."
+            "Fix: pass the folder containing your downloaded Instagram JSON files."
         )
 
     rows = []
@@ -180,10 +256,11 @@ def parse_instagram(
         except Exception:
             continue
 
-        # ---------------------------
+        # ----------------------------------------------------
         # STORY ACTIVITY (dict JSON)
-        # ---------------------------
+        # ----------------------------------------------------
         if isinstance(data, dict):
+
             # Story likes
             if "story_activities_story_likes" in data:
                 items = data.get("story_activities_story_likes", []) or []
@@ -206,10 +283,6 @@ def parse_instagram(
                             continue
                         try:
                             unix_ts = int(unix_ts)
-                        except (TypeError, ValueError):
-                            continue
-
-                        try:
                             dt_local = unix_to_local_dt(unix_ts, tz)
                         except Exception:
                             continue
@@ -247,14 +320,11 @@ def parse_instagram(
                             continue
                         try:
                             unix_ts = int(unix_ts)
-                        except (TypeError, ValueError):
-                            continue
-
-                        value = entry.get("value", "") or ""
-                        try:
                             dt_local = unix_to_local_dt(unix_ts, tz)
                         except Exception:
                             continue
+
+                        value = entry.get("value", "") or ""
 
                         rows.append({
                             "object_type": "story",
@@ -267,9 +337,9 @@ def parse_instagram(
                             "timestamp_unix": unix_ts,
                         })
 
-        # ---------------------------
+        # ----------------------------------------------------
         # REEL COMMENTS (dict JSON)
-        # ---------------------------
+        # ----------------------------------------------------
         if isinstance(data, dict) and "comments_reels_comments" in data:
             items = data.get("comments_reels_comments", []) or []
             if not isinstance(items, list):
@@ -287,7 +357,7 @@ def parse_instagram(
                 owner_info = string_map.get("Media Owner", {}) or {}
                 time_info = string_map.get("Time", {}) or {}
 
-                if not isinstance(comment_info, dict) or not isinstance(owner_info, dict) or not isinstance(time_info, dict):
+                if not all(isinstance(x, dict) for x in [comment_info, owner_info, time_info]):
                     continue
 
                 value = comment_info.get("value", "") or ""
@@ -298,10 +368,6 @@ def parse_instagram(
                     continue
                 try:
                     unix_ts = int(unix_ts)
-                except Exception:
-                    continue
-
-                try:
                     dt_local = unix_to_local_dt(unix_ts, tz)
                 except Exception:
                     continue
@@ -317,9 +383,9 @@ def parse_instagram(
                     "timestamp_unix": unix_ts,
                 })
 
-        # ---------------------------
+        # ----------------------------------------------------
         # POST COMMENTS (list JSON)
-        # ---------------------------
+        # ----------------------------------------------------
         if isinstance(data, list):
             for item in data:
                 if not isinstance(item, dict):
@@ -334,10 +400,14 @@ def parse_instagram(
                     media_list = []
 
                 comment_info = string_map.get("Comment", {}) or {}
-                owner_info = string_map.get("MediaOwner", {}) or string_map.get("Media Owner", {}) or {}
+                owner_info = (
+                    string_map.get("MediaOwner", {}) or
+                    string_map.get("Media Owner", {}) or
+                    {}
+                )
                 time_info = string_map.get("Time", {}) or {}
 
-                if not isinstance(comment_info, dict) or not isinstance(owner_info, dict) or not isinstance(time_info, dict):
+                if not all(isinstance(x, dict) for x in [comment_info, owner_info, time_info]):
                     continue
 
                 value = comment_info.get("value", "") or ""
@@ -348,17 +418,13 @@ def parse_instagram(
                     continue
                 try:
                     unix_ts = int(unix_ts)
+                    dt_local = unix_to_local_dt(unix_ts, tz)
                 except Exception:
                     continue
 
                 target = ""
                 if media_list and isinstance(media_list[0], dict):
                     target = media_list[0].get("uri", "") or ""
-
-                try:
-                    dt_local = unix_to_local_dt(unix_ts, tz)
-                except Exception:
-                    continue
 
                 rows.append({
                     "object_type": "post",
@@ -377,5 +443,5 @@ def parse_instagram(
     return EventTable(base)
 
 
-# Compatibility for older code versions
+# Backward compatibility
 instagram_events = parse_instagram

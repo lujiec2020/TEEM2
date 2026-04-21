@@ -10,9 +10,9 @@ DEFAULT_TZ = "America/New_York"
 COLUMNS = ["platform", "object_type", "action_type", "username", "target", "value", "timestamp"]
 
 
-# -------------------------
+# ============================================================
 # Beginner-friendly errors
-# -------------------------
+# ============================================================
 
 class StudentInputError(Exception):
     """Friendly error for student mistakes (bad path, bad dates, etc.)."""
@@ -20,19 +20,39 @@ class StudentInputError(Exception):
 
 
 def _raise(msg: str):
+    """Raise a StudentInputError with a consistent prefix."""
     raise StudentInputError("⚠️ " + msg)
 
 
-# -------------------------
-# Date parsing + filtering
-# -------------------------
+# ============================================================
+# Date parsing + time column helpers
+# ============================================================
 
 def _parse_user_date(s: str) -> date:
     """
-    Accepts:
-      - "12-16-2025" or "1-8-2026" (MM-DD-YYYY / M-D-YYYY)
-      - "2025-12-16" (YYYY-MM-DD)
-      - "12/16/2025" (MM/DD/YYYY)
+    Convert a user-provided date string into a `datetime.date`.
+
+    Accepted formats
+    ----------------
+    - ``MM-DD-YYYY``  (e.g., ``12-16-2025``)
+    - ``M-D-YYYY``    (e.g., ``1-8-2026``)
+    - ``YYYY-MM-DD``  (e.g., ``2025-12-16``)
+    - ``MM/DD/YYYY``  (e.g., ``12/16/2025``)
+
+    Parameters
+    ----------
+    s : str
+        A date string provided by the student.
+
+    Returns
+    -------
+    datetime.date
+        Parsed date object.
+
+    Raises
+    ------
+    StudentInputError
+        If the date format is invalid.
     """
     if s is None:
         return None
@@ -53,9 +73,26 @@ def _parse_user_date(s: str) -> date:
 
 
 def add_basic_time_columns(t: Table) -> Table:
-    """Adds: timestamp_dt, hour, weekday, date from timestamp string."""
+    """
+    Add standard time columns derived from the TikTok timestamp string.
+
+    Adds the following columns:
+    - ``timestamp_dt`` : Python datetime object
+    - ``hour``         : Hour of day (0–23)
+    - ``weekday``      : Day name (e.g., ``'Monday'``)
+    - ``date``         : ``datetime.date`` version of timestamp
+
+    Parameters
+    ----------
+    t : Table
+        A datascience Table containing a ``timestamp`` column.
+
+    Returns
+    -------
+    Table
+        The table with added time columns.
+    """
     def to_dt(ts):
-        # drop timezone token (EST/EDT/etc.)
         parts = str(ts).split(" ")
         if len(parts) < 3:
             return None
@@ -73,14 +110,35 @@ def add_basic_time_columns(t: Table) -> Table:
 
 
 def filter_by_date_range(table: Table, start_date=None, end_date=None) -> Table:
-    """Filter by start/end date using the 'date' column (created if missing)."""
+    """
+    Filter a TikTok events table by date range.
+
+    Parameters
+    ----------
+    table : Table
+        A datascience Table containing TikTok events.
+    start_date : str or None
+        Start of the date range (any accepted user format).
+    end_date : str or None
+        End of the date range (any accepted user format).
+
+    Returns
+    -------
+    Table
+        A filtered table containing only rows whose dates fall within the range.
+
+    Notes
+    -----
+    - If both dates are ``None``, the table is returned unchanged.
+    - If the table lacks a ``date`` column, it is added automatically.
+    """
     if start_date is None and end_date is None:
         return table
 
     start_d = _parse_user_date(start_date) if start_date is not None else None
     end_d = _parse_user_date(end_date) if end_date is not None else None
 
-    if start_d is not None and end_d is not None and end_d < start_d:
+    if start_d and end_d and end_d < start_d:
         _raise(
             "end_date must be the same as or after start_date.\n"
             "Fix: check the year (example: Dec 2025 to Jan 2026 should end_date='1-8-2026')."
@@ -98,9 +156,9 @@ def filter_by_date_range(table: Table, start_date=None, end_date=None) -> Table:
     return t
 
 
-# -------------------------
+# ============================================================
 # Main TikTok parser
-# -------------------------
+# ============================================================
 
 def tiktok_events(
     json_path: str,
@@ -109,11 +167,44 @@ def tiktok_events(
     end_date: str | None = None,
 ) -> Table:
     """
-    Parse TikTok user_data_tiktok.json into events table with columns:
-      platform, object_type, action_type, username, target, value, timestamp
+    Parse a TikTok ``user_data_tiktok.json`` export into a unified events table.
 
-    Optional:
-      start_date / end_date (filters after building)
+    Output columns
+    --------------
+    - ``platform``     (always ``"tiktok"``)
+    - ``object_type``  (e.g., ``"video"``, ``"search"``, ``"comment"``)
+    - ``action_type``  (e.g., ``"watch"``, ``"like"``, ``"share"``)
+    - ``username``     (always ``"self"`` for TikTok exports)
+    - ``target``       (URL or media reference)
+    - ``value``        (search term, comment text, etc.)
+    - ``timestamp``    (local-time string)
+
+    Parameters
+    ----------
+    json_path : str
+        Path to ``user_data_tiktok.json``.
+    tz : str
+        Timezone for timestamp conversion.
+    start_date : str or None
+        Optional start date filter.
+    end_date : str or None
+        Optional end date filter.
+
+    Returns
+    -------
+    Table
+        A datascience Table containing all parsed TikTok events.
+
+    Raises
+    ------
+    StudentInputError
+        If the file path is missing or invalid.
+
+    Examples
+    --------
+    >>> t = tiktok_events("data/user_data_tiktok.json")
+    >>> t.num_rows
+    542
     """
     if json_path is None or str(json_path).strip() == "":
         _raise("TikTok JSON path is empty. Fix: pass something like 'data/user_data_tiktok.json'.")
@@ -132,6 +223,7 @@ def tiktok_events(
     username = "self"
 
     def add(platform, object_type, action_type, ts_str, target="", value=""):
+        """Internal helper to append a TikTok event row."""
         if not ts_str:
             return
         try:
@@ -149,10 +241,12 @@ def tiktok_events(
             "timestamp": ts,
         })
 
+    # ---------------------------
     # WATCH HISTORY
+    # ---------------------------
     watch = data.get("Your Activity", {}).get("Watch History", {}).get("VideoList", []) or []
     if not isinstance(watch, list):
-        watch = []  # PDF fix
+        watch = []
 
     for it in watch:
         if not isinstance(it, dict):
@@ -165,10 +259,12 @@ def tiktok_events(
             target=(it.get("Link") or it.get("link") or it.get("url") or ""),
         )
 
+    # ---------------------------
     # LIKES
+    # ---------------------------
     likes = data.get("Likes and Favorites", {}).get("Like List", {}).get("ItemFavoriteList", []) or []
     if not isinstance(likes, list):
-        likes = []  # PDF fix
+        likes = []
 
     for it in likes:
         if not isinstance(it, dict):
@@ -181,10 +277,12 @@ def tiktok_events(
             target=(it.get("link") or it.get("Link") or it.get("url") or ""),
         )
 
+    # ---------------------------
     # SEARCHES
+    # ---------------------------
     searches = data.get("Your Activity", {}).get("Searches", {}).get("SearchList", []) or []
     if not isinstance(searches, list):
-        searches = []  # PDF fix
+        searches = []
 
     for it in searches:
         if not isinstance(it, dict):
@@ -192,10 +290,12 @@ def tiktok_events(
         term = it.get("SearchTerm") or it.get("Search") or it.get("Term") or ""
         add("tiktok", "search", "search", it.get("Date") or it.get("date"), value=term)
 
+    # ---------------------------
     # COMMENTS
+    # ---------------------------
     comments = data.get("Comment", {}).get("Comments", {}).get("CommentsList", []) or []
     if not isinstance(comments, list):
-        comments = []  # PDF fix
+        comments = []
 
     for it in comments:
         if not isinstance(it, dict):
@@ -204,10 +304,12 @@ def tiktok_events(
         url = it.get("url") or it.get("Link") or it.get("link") or ""
         add("tiktok", "comment", "comment", it.get("date") or it.get("Date"), target=url, value=txt)
 
+    # ---------------------------
     # SHARES
+    # ---------------------------
     shares = data.get("Your Activity", {}).get("Share History", {}).get("ShareHistoryList", []) or []
     if not isinstance(shares, list):
-        shares = []  # PDF fix
+        shares = []
 
     for it in shares:
         if not isinstance(it, dict):
@@ -216,10 +318,12 @@ def tiktok_events(
         method = it.get("Method") or ""
         add("tiktok", "share", "share", it.get("Date") or it.get("date"), target=url, value=method)
 
+    # ---------------------------
     # REPOSTS
+    # ---------------------------
     reposts = data.get("Your Activity", {}).get("Reposts", {}).get("RepostList", []) or []
     if not isinstance(reposts, list):
-        reposts = []  # PDF fix
+        reposts = []
 
     for it in reposts:
         if not isinstance(it, dict):
@@ -227,8 +331,10 @@ def tiktok_events(
         url = it.get("url") or it.get("Link") or it.get("link") or ""
         add("tiktok", "video", "repost", it.get("Date") or it.get("date"), target=url)
 
+    # Sort chronologically
     rows.sort(key=lambda r: r["timestamp"])
 
+    # Build final table
     t = rows_to_table(rows, columns=COLUMNS)
     t = add_basic_time_columns(t)
     t = filter_by_date_range(t, start_date=start_date, end_date=end_date)
@@ -236,11 +342,23 @@ def tiktok_events(
     return t
 
 
-# -------------------------
+# ============================================================
 # Summaries + indicators
-# -------------------------
+# ============================================================
 
 def tiktok_watch_summary(t: Table):
+    """
+    Produce summary tables for TikTok watch activity.
+
+    Returns
+    -------
+    dict
+        Keys:
+        - ``total`` : total watch events
+        - ``by_hour`` : watch events grouped by hour
+        - ``by_weekday`` : grouped by weekday
+        - ``by_date`` : grouped by date
+    """
     watch = t.where("action_type", "watch")
 
     total = Table().with_columns(
@@ -268,7 +386,27 @@ def tiktok_late_night_binge(
     end_date: str | None = None,
 ):
     """
-    Late-night binge indicator (watch events between start_hour..23 OR 0..end_hour).
+    Identify late-night TikTok watching behavior.
+
+    Late-night hours are defined as:
+    - ``start_hour`` through 23
+    - 0 through ``end_hour``
+
+    Parameters
+    ----------
+    t : Table
+        TikTok events table.
+    start_hour : int
+        Start of late-night window (default 23).
+    end_hour : int
+        End of late-night window (default 4).
+    start_date, end_date : str or None
+        Optional date filters.
+
+    Returns
+    -------
+    dict
+        Summary table and late-night events grouped by date.
     """
     t2 = filter_by_date_range(t, start_date=start_date, end_date=end_date)
     watch = t2.where("action_type", "watch")
@@ -309,8 +447,32 @@ def tiktok_doomscroll_indicator(
     top_n_days: int = 10,
 ):
     """
-    Doomscroll indicator heuristic:
-      score = watch_events + 2*late_night_watch_events + (10 if sessions_est>=3 else 0)
+    Compute a heuristic "doomscroll score" for each day.
+
+    Score formula
+    -------------
+    ``score = watch_events + 2*late_night_watch_events + (10 if sessions_est >= 3 else 0)``
+
+    Parameters
+    ----------
+    t : Table
+        TikTok events table.
+    start_date, end_date : str or None
+        Optional date filters.
+    late_start : int
+        Start of late-night window.
+    late_end : int
+        End of late-night window.
+    session_gap_minutes : int
+        Gap threshold for splitting sessions.
+    top_n_days : int
+        Number of top-scoring days to return.
+
+    Returns
+    -------
+    dict
+        - ``summary`` : overall metrics
+        - ``day_scores`` : top N days ranked by doomscroll score
     """
     t2 = filter_by_date_range(t, start_date=start_date, end_date=end_date)
     watch = t2.where("action_type", "watch")
@@ -349,33 +511,3 @@ def tiktok_doomscroll_indicator(
 
     rows = []
     for d, cnt in zip(dates, counts):
-        late_cnt = late_map.get(d, 0)
-        sessions = session_count_for_date(d)
-        score = cnt + 2 * late_cnt + (10 if sessions >= 3 else 0)
-
-        rows.append((d, cnt, late_cnt, sessions, score))
-
-    day_scores = Table().with_columns(
-        "date", [r[0] for r in rows],
-        "watch_events", [r[1] for r in rows],
-        "late_night_watch_events", [r[2] for r in rows],
-        "sessions_est", [r[3] for r in rows],
-        "doomscroll_score", [r[4] for r in rows],
-    ).sort("doomscroll_score", descending=True)
-
-    top_days = day_scores.take(range(min(top_n_days, day_scores.num_rows))) if day_scores.num_rows else day_scores
-
-    overall = Table().with_columns(
-        "metric",
-        ["date_range", "total_watch_events", "unique_watch_days", "session_gap_minutes", "late_hours"],
-        "value",
-        [
-            f"{start_date} to {end_date}" if (start_date or end_date) else "all_time",
-            watch.num_rows,
-            len(set(watch.column("date"))),
-            session_gap_minutes,
-            f"{late_start}:00–{late_end}:59 (wrap)",
-        ],
-    )
-
-    return {"summary": overall, "day_scores": top_days}
