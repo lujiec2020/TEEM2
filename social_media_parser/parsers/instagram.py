@@ -16,7 +16,7 @@ class StudentInputError(Exception):
 
 
 def _raise(msg: str):
-    raise StudentInputError("⚠️ " + msg)
+    raise StudentInputError("Error: " + msg)
 
 
 # -------------------------
@@ -77,9 +77,61 @@ def filter_by_date_range(table, start_date=None, end_date=None):
     if end_d is not None:
         t = t.where("date", lambda d: d is not None and d <= end_d)
 
-    # keep date column (it’s useful) OR drop it — your call:
-    # t = t.drop("date")
     return t
+
+
+# -------------------------
+# NEW: Reindex Instagram by date range
+# -------------------------
+
+def reindex_instagram_by_date_range(t, start_str: str, end_str: str):
+    """
+    Reindex Instagram events within a date range using 1, 2, 3, ...
+    Date format: 'MM-DD-YYYY' (also accepts YYYY-MM-DD and MM/DD/YYYY).
+    Works on EventTable or raw datascience.Table.
+    """
+
+    # Convert user input to date objects
+    start_date = _parse_user_date(start_str)
+    end_date = _parse_user_date(end_str)
+
+    if end_date < start_date:
+        _raise(
+            "end_date must be the same as or after start_date.\n"
+            "Fix: check the year (example: Dec 2025 to Jan 2026 should end_date='1-8-2026')."
+        )
+
+    # If user passed an EventTable, extract the underlying table
+    if hasattr(t, "table"):
+        base = t.table
+    else:
+        base = t
+
+    # Ensure timestamp_dt exists
+    if "timestamp_dt" not in base.labels:
+        _raise("Instagram table is missing 'timestamp_dt'. This should never happen unless the parser failed.")
+
+    # Add a date column for filtering
+    base = base.with_column(
+        "date",
+        base.apply(lambda dt: dt.date() if dt else None, "timestamp_dt")
+    )
+
+    # Filter rows inside the date range
+    filtered = base.where(
+        "date",
+        lambda d: d is not None and start_date <= d <= end_date
+    )
+
+    # If no rows, return empty table
+    if filtered.num_rows == 0:
+        return filtered
+
+    # Add sequential index column
+    new_index = list(range(1, filtered.num_rows + 1))
+    filtered = filtered.with_column("relative_range_index", new_index)
+
+    return filtered
 
 
 # -------------------------
@@ -103,9 +155,6 @@ def parse_instagram(
         Timezone for timestamp conversion.
     start_date / end_date : str | None
         Optional date range filter.
-        Examples:
-          start_date="12-16-2025", end_date="1-8-2026"
-          start_date="2025-12-16", end_date="2026-01-08"
     """
     if path is None or str(path).strip() == "":
         _raise("Instagram folder path is empty. Fix: pass a folder like 'data' (or '.' for current folder).")
@@ -162,8 +211,7 @@ def parse_instagram(
 
                         try:
                             dt_local = unix_to_local_dt(unix_ts, tz)
-                        except (OverflowError, OSError, ValueError):
-                            # PDF fix: timestamp overflow -> skip
+                        except Exception:
                             continue
 
                         rows.append({
@@ -205,7 +253,7 @@ def parse_instagram(
                         value = entry.get("value", "") or ""
                         try:
                             dt_local = unix_to_local_dt(unix_ts, tz)
-                        except (OverflowError, OSError, ValueError):
+                        except Exception:
                             continue
 
                         rows.append({
@@ -233,7 +281,7 @@ def parse_instagram(
 
                 string_map = item.get("string_map_data", {}) or {}
                 if not isinstance(string_map, dict):
-                    continue  # PDF fix: string_map_data may not be a dict
+                    continue
 
                 comment_info = string_map.get("Comment", {}) or {}
                 owner_info = string_map.get("Media Owner", {}) or {}
@@ -250,12 +298,12 @@ def parse_instagram(
                     continue
                 try:
                     unix_ts = int(unix_ts)
-                except (TypeError, ValueError):
+                except Exception:
                     continue
 
                 try:
                     dt_local = unix_to_local_dt(unix_ts, tz)
-                except (OverflowError, OSError, ValueError):
+                except Exception:
                     continue
 
                 rows.append({
@@ -286,7 +334,7 @@ def parse_instagram(
                     media_list = []
 
                 comment_info = string_map.get("Comment", {}) or {}
-                owner_info = string_map.get("Media Owner", {}) or {}
+                owner_info = string_map.get("MediaOwner", {}) or string_map.get("Media Owner", {}) or {}
                 time_info = string_map.get("Time", {}) or {}
 
                 if not isinstance(comment_info, dict) or not isinstance(owner_info, dict) or not isinstance(time_info, dict):
@@ -300,7 +348,7 @@ def parse_instagram(
                     continue
                 try:
                     unix_ts = int(unix_ts)
-                except (TypeError, ValueError):
+                except Exception:
                     continue
 
                 target = ""
@@ -309,7 +357,7 @@ def parse_instagram(
 
                 try:
                     dt_local = unix_to_local_dt(unix_ts, tz)
-                except (OverflowError, OSError, ValueError):
+                except Exception:
                     continue
 
                 rows.append({
