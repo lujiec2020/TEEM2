@@ -15,7 +15,6 @@ Instagram Data Takeout Instructions
 3.  Click Export your information.
 4.  Click Create export.
 5.  Select the profile you’d like to export information from.
-
 6.  Click Next.
 7.  Select Export to device.
 8.  From here, you can choose specific info to export, select a date range, format, the
@@ -24,7 +23,41 @@ notification email, and media quality. Make sure to download a JSON file format
 9.  Once you have customized your export, click Start export.
 10. Data exportation can take anywhere from a few hours to multiple days
 
-TikTok Functions Guide (Student Walkthrough)
+Data Extraction:
+
+TikTok: Download your TikTok data to a device (JSON)
+
+TikTok Data Takeout Instructions
+
+1.  Open the TikTok app and go to your Profile.
+2.  Tap the ☰ (menu) in the top right, then tap Settings and privacy.
+3.  Go to Account (or Privacy) and find Download your data (sometimes listed as
+
+Download TikTok data).
+
+4.  Tap Request data / Request download.
+
+If TikTok asks for a file format, choose JSON (not HTML / TXT), so it works with this
+parser.
+
+5.  Wait until the request finishes processing (this can take some time depending on
+
+account size).
+
+6.  Return to Download your data and open the Download data tab, then download the
+
+export to your device.
+
+7.  Unzip the downloaded file. Locate the TikTok export file your project uses (example
+naming may vary, but your repo expects something like user_data_tiktok.json).
+
+8.  Place the JSON file into your project’s data/ folder (same place as the Instagram
+
+JSONs).
+
+Instagram Functions Guide (Student Walkthrough)
+
+TikTok Functions Guide (Student Walkthrough)
 
 1)
 
@@ -63,7 +96,7 @@ timestamp_dt – datetime version used internally
 
 Example (all time):
 
-None
+None
 
 from src.tiktok_tables.tiktok_events import tiktok_events
 
@@ -73,7 +106,7 @@ tz="America/New_York")
 
 t.show(10)
 
-Example (custom date range):
+Example (custom date range):
 
 None
 
@@ -111,7 +144,7 @@ total – total number of watch events
 
 ●  by_weekday – watch count by weekday
 
-●  by_date – watch count by date (daily activity)
+●  by_date – watch count by date (daily activity)
 
 Example:
 
@@ -121,7 +154,7 @@ from src.tiktok_tables.tiktok_events import tiktok_events,
 
 tiktok_watch_summary
 
-t = tiktok_events("data/user_data_tiktok.json",
+t = tiktok_events("data/user_data_tiktok.json",
 
 tz="America/New_York")
 
@@ -157,11 +190,11 @@ Parameters you can change:
 
 ●  start_hour and end_hour – define the late-night window (wraps past midnight)
 
-●  start_date and end_date – optional date filtering (same format as above)
+●  start_date and end_date – optional date filtering (same format as above)
 
 Example (late-night behavior for a date range):
 
-None
+None
 
 from src.tiktok_tables.tiktok_events import tiktok_events,
 
@@ -202,13 +235,13 @@ What it does:
 
 Produces a “doomscroll indicator” by identifying heavy watch days using:
 
-●  high daily watch volume
+●  high daily watch volume
 
 ●
 
 late-night watch activity
 
-●  estimated session count (based on gaps between watches)
+●  estimated session count (based on gaps between watches)
 
 This helps find your most intense usage days.
 
@@ -252,13 +285,13 @@ doom = tiktok_doomscroll_indicator(
 
     start_date="12-16-2025",
 
-    end_date="1-8-2026",
+    end_date="1-8-2026",
 
     session_gap_minutes=20,
 
     top_n_days=10
 
-)
+)
 
 doom["summary"].show()
 
@@ -275,4 +308,5 @@ late_night_watch_events – how many watches occurred in late-night hours
 ●  sessions_est – estimated number of sessions that day
 
 ●  doomscroll_score – a combined score (higher = heavier usage day)
+
 
