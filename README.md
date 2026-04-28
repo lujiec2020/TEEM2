@@ -46,7 +46,7 @@ Can be found here: docs/social_media_takeout_guide.md
 - Full Project Documentation
 Detailed explanation of functions, schema, and error handling
 
-Can be found here: docs/parser_documentation.md
+Can be found here: docs/final_documentation.md
 
 Error Handling: 
 
