@@ -1,16 +1,21 @@
 Creators: Amreen Adams and Giancarlos Aviles
+
 Questions? Reach out: AD70738@umbc.edu, gaviles1@umbc.edu
 
-Parser Overview: The Social Media Parser requires official data exports from Instagram and TikTok.
+Social Media Parser Overview: 
+
+The Social Media Parser requires official data exports from Instagram and TikTok.
 This guide walks you through:
 - How to download your data
 - What files matter
 - Where to place them in your project
 - How to avoid common student mistakes
 
-Data Extraction:
-Instagram: Export your Instagram information from Accounts Center to a device
-Instagram Data Takeout Instructions
+Data Extraction: Instagram 
+
+Export your Instagram information from Accounts Center to a device
+
+Instagram Data Takeout Instructions:
 
 1.  Click the More icon in the bottom left, then click Settings
 2.  Click Accounts Center, then click Your information and permissions.
@@ -25,13 +30,11 @@ notification email, and media quality. Make sure to download a JSON file format
 10. Data exportation can take anywhere from a few hours to multiple days
 
 What Files You Will Receive:
-Your ZIP will look like: instagram-<username>-data.zip
+
 Inside, you’ll see folders such as:
-comments/
-likes/
-stories/
-messages/
-media/
+
+<img width="717" height="136" alt="Screenshot 2026-04-28 at 4 07 57 PM" src="https://github.com/user-attachments/assets/cc55e9d0-12bb-4768-bc4b-9b244114313f" />
+
 
 The parser uses only the JSON files, especially:
 - story_activities_story_likes.json
@@ -44,13 +47,9 @@ How to Extract and Organize the Files:
 2. Locate the folder containing all the JSON files
 3. Move all selected JSON files into: data/instagram_data/
 4. Your Folder should look like this:
-data/
-   instagram_data/
-       story_activities_story_likes.json
-       story_activities_polls.json
-       comments_reels_comments.json
-       post_comments.json
-       ...
+
+<img width="719" height="177" alt="Screenshot 2026-04-28 at 4 06 58 PM" src="https://github.com/user-attachments/assets/83a6614f-61c9-400f-bd6b-536345ccbb40" />
+
 
 Data Extraction:
 TikTok: Download your TikTok data to a device (JSON)
@@ -64,8 +63,12 @@ TikTok Data Takeout Instructions
 6.  Return to Download your data and open the Download data tab, then download the export to your device.
 
 What Files You Will Receive:
+
 Your ZIP will contain: user_data_tiktok.json
+
 This is the only file the parser needs.
+
+
 It includes: Watch history, Likes, Searches, Comments, Shares, Reposts
 
 How to Extract and Organize the Files:
@@ -73,29 +76,16 @@ How to Extract and Organize the Files:
 2. Locate user_data_tiktok.json
 3. Move it into: data/tiktok_data/user_data_tiktok.json
 4. Your folder should look like:
- data/
-   tiktok_data/
-       user_data_tiktok.json
+<img width="717" height="94" alt="Screenshot 2026-04-28 at 4 06 19 PM" src="https://github.com/user-attachments/assets/7533d8ec-97c6-4316-90fa-3235e1a33dac" />
 
-Required Folder Structure:
+
+Required Folder Structure: 
 Your project must look like this:
-TEEM2-main/
-│
-├── data/
-│   ├── instagram_data/
-│   │     *.json files from Instagram
-│   │
-│   └── tiktok_data/
-│         user_data_tiktok.json
-│
-├── social_media_functions/
-│   └── parse_metadata/
-│         main_parser.py
-│         utils.py
-│         time_features.py
-│
-└── analysis.ipynb
-* If the folders are missing, create them manually.
+
+If the folders are missing, create them manually. 
+
+<img width="712" height="404" alt="Screenshot 2026-04-28 at 3 59 06 PM" src="https://github.com/user-attachments/assets/d8733c91-87ce-4159-87bf-78b6384e5a4b" />
+
 
 Troubleshooting: 
 
@@ -113,6 +103,13 @@ MM/DD/YYYY
 
 Problem: “No data found”
 Check if Both Instagram and TikTok paths are wrong, Folders are empty, JSON files missing
+
+Common Instagram Errors
+<img width="716" height="203" alt="Screenshot 2026-04-28 at 4 04 28 PM" src="https://github.com/user-attachments/assets/ca898000-d703-4bca-ab44-299841825a29" />
+
+Common Tiktok Errors
+<img width="721" height="208" alt="Screenshot 2026-04-28 at 4 04 14 PM" src="https://github.com/user-attachments/assets/d9e9e815-8dce-4bcb-8f87-c99b82b49608" />
+
 
 
 
