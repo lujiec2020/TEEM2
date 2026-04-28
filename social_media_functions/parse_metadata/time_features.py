@@ -6,14 +6,34 @@ from datascience import Table
 @dataclass
 class EventTable:
     """
-    Simple wrapper around a datascience.Table with helper methods.
+    Wrapper around a `datascience.Table` with convenience methods.
 
-    IMPORTANT: Methods return NEW EventTable objects (does not mutate in place).
+    This class provides helper methods for common table transformations
+    while preserving immutability (methods return new EventTable instances).
+
+    Attributes:
+        table (Table): Underlying datascience table.
+
+    Notes:
+        All methods return a NEW EventTable and do not modify the original table.
     """
     table: Table
 
     def hide(self, *cols) -> "EventTable":
-        """Return a new EventTable with the given columns removed (if they exist)."""
+        """
+        Remove specified columns from the table.
+
+        Only columns that exist in the table will be removed; others are ignored.
+
+        Args:
+            *cols (str): Column names to remove.
+
+        Returns:
+            EventTable: New EventTable with specified columns removed.
+
+        Example:
+            >>> et.hide("timestamp", "value")
+        """
         labels = set(self.table.labels)
         to_drop = [c for c in cols if c in labels]
         if not to_drop:
@@ -22,16 +42,27 @@ class EventTable:
 
     def get_time_conversions(self, features, dt_col: str = "timestamp_dt") -> "EventTable":
         """
-        Add time-based features derived from a datetime column.
+        Add time-based feature columns derived from a datetime column.
 
         Supported features:
-          - "hour"
-          - "weekday"
-          - "month"
-          - "year"
-          - "date"
+            - "hour"
+            - "weekday"
+            - "month"
+            - "year"
+            - "date"
 
-        Returns a NEW EventTable.
+        Args:
+            features (str | list[str]): One or more feature names to generate.
+            dt_col (str): Name of the datetime column to use.
+
+        Returns:
+            EventTable: New EventTable with additional time-based columns.
+
+        Raises:
+            ValueError: If an unsupported feature is requested.
+
+        Example:
+            >>> et.get_time_conversions(["hour", "weekday"])
         """
         if isinstance(features, str):
             features = [features]

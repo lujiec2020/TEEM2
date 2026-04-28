@@ -3,7 +3,25 @@ import pytz
 from datascience import Table
 
 
-# Standard column schema for all event tables
+"""
+time_utils.py
+
+Helper utilities for working with event-based data.
+
+This module provides:
+- Standardized event table schema
+- Timestamp conversion and formatting utilities
+- Conversion from raw event rows to structured tables
+- Relative day indexing based on active days
+
+All outputs are designed to integrate with `datascience.Table`.
+"""
+
+
+# ============================================================
+# Constants
+# ============================================================
+
 EVENT_COLUMNS = [
     "object_type",
     "action_type",
@@ -13,67 +31,86 @@ EVENT_COLUMNS = [
     "timestamp_dt",
     "timestamp",
     "timestamp_unix",
-    "relative_day_index",  # Added for relative indexing
+    "relative_day_index",
 ]
+"""
+list[str]: Standard column schema for all event tables.
 
+Columns:
+    object_type (str): Type of object (e.g., "video", "story").
+    action_type (str): Action performed (e.g., "watch", "like").
+    username (str): Actor associated with the event.
+    target (str): Target content (e.g., URL, post).
+    value (str): Additional metadata or text.
+    timestamp_dt (datetime): Parsed datetime object.
+    timestamp (str): Human-readable timestamp.
+    timestamp_unix (int): Unix timestamp.
+    relative_day_index (int | str): Index of active day (1-based).
+"""
+
+
+# ============================================================
+# Timestamp utilities
+# ============================================================
 
 def unix_to_local_dt(unix_ts: int, tz: str = "America/New_York") -> datetime:
     """
-    Convert a Unix timestamp to a timezone-aware datetime object.
+    Convert a Unix timestamp to a timezone-aware datetime.
 
-    Parameters
-    ----------
-    unix_ts : int
-        Unix timestamp (seconds since epoch).
-    tz : str, optional
-        Timezone string (default is "America/New_York").
+    Args:
+        unix_ts (int): Unix timestamp (seconds since epoch).
+        tz (str): Timezone string (default: "America/New_York").
 
-    Returns
-    -------
-    datetime
-        Timezone-aware datetime corresponding to the given Unix timestamp.
+    Returns:
+        datetime: Timezone-aware datetime object.
 
-    Raises
-    ------
-    ValueError
-        If the timestamp cannot be converted to an integer.
+    Raises:
+        ValueError: If the timestamp cannot be converted to an integer.
+
+    Example:
+        >>> unix_to_local_dt(1700000000)
     """
     return datetime.fromtimestamp(int(unix_ts), pytz.timezone(tz))
 
 
 def format_timestamp(dt: datetime) -> str:
     """
-    Format a datetime object into a readable string.
+    Format a datetime object into a readable timestamp string.
 
-    Parameters
-    ----------
-    dt : datetime
-        Datetime object to format.
+    Format:
+        "YYYY-MM-DD HH:MM:SS AM/PM TZ"
 
-    Returns
-    -------
-    str
-        Formatted timestamp string (e.g., "2025-03-10 02:30:45 PM EST").
+    Args:
+        dt (datetime): Datetime object to format.
+
+    Returns:
+        str: Formatted timestamp string.
+
+    Example:
+        >>> format_timestamp(datetime.now())
     """
     return dt.strftime("%Y-%m-%d %I:%M:%S %p %Z")
 
+
+# ============================================================
+# Table utilities
+# ============================================================
 
 def rows_to_table(rows: list) -> Table:
     """
     Convert a list of event dictionaries into a structured Table.
 
-    Each dictionary in the input list should follow the standard event schema
-    defined in EVENT_COLUMNS. Missing values are filled with empty strings.
+    Each row should follow the standard schema defined in `EVENT_COLUMNS`.
+    Missing values are filled with empty strings.
 
-    Parameters
-    ----------
-    rows : list of dict
-        List of event records where each record is a dictionary.
+    Args:
+        rows (list[dict]): List of event records.
 
-    Returns
-    -------
-    Table
-        A datascience Table containing all rows with standardized columns.
+    Returns:
+        Table: datascience Table with standardized columns.
+
+    Notes:
+        Column order strictly follows `EVENT_COLUMNS`.
     """
     table = Table()
 
@@ -83,24 +120,31 @@ def rows_to_table(rows: list) -> Table:
     return table
 
 
+# ============================================================
+# Relative day indexing
+# ============================================================
+
 def index_by_active_day(rows: list) -> list:
     """
-    Add a relative day index to each event based only on days with activity.
+    Assign a relative day index to events based on active days.
 
-    The first day with any activity is assigned index 1, the next active day
-    is index 2, and so on. Days with no activity are skipped.
+    The first day with activity is assigned index 1, the next active day
+    is index 2, and so on. Days without activity are skipped.
 
-    Parameters
-    ----------
-    rows : list of dict
-        List of event records. Each record must contain 'timestamp_unix'.
+    Args:
+        rows (list[dict]): List of event records. Each record must contain
+            'timestamp_unix'.
 
-    Returns
-    -------
-    list of dict
-        Updated rows with an added 'relative_day_index' field.
+    Returns:
+        list[dict]: Updated rows with a 'relative_day_index' field added.
+
+    Notes:
+        - Rows without valid timestamps receive an empty index.
+        - Indexing is based only on unique active dates.
+
+    Example:
+        >>> indexed_rows = index_by_active_day(rows)
     """
-
     if not rows:
         return rows
 
@@ -112,7 +156,7 @@ def index_by_active_day(rows: list) -> list:
         else:
             row["_date"] = None
 
-    # Step 2: Get unique active dates (skip missing)
+    # Step 2: Get unique active dates
     unique_dates = sorted({row["_date"] for row in rows if row["_date"] is not None})
 
     # Step 3: Create mapping (date → index)
