@@ -1,5 +1,6 @@
 from .main_parser import (
-    parse_instagram,
+    parse_metadata,
+    tiktok_events,
     social_media_events,
 )
 
