@@ -2,14 +2,6 @@
 social_media_parser.py
 
 Utilities for parsing and analyzing Instagram and TikTok data exports.
-
-This module provides:
-- Parsing functions for Instagram and TikTok JSON data
-- Timezone normalization and timestamp formatting
-- Filtering by date ranges
-- Analytical helpers for usage patterns (e.g., late-night activity, binge behavior)
-
-All outputs are returned as `datascience.Table` objects.
 """
 
 import json
@@ -25,25 +17,10 @@ from datascience import Table
 # ============================================================
 
 class StudentInputError(Exception):
-    """
-    Custom exception for user-facing input errors.
-
-    This is used to provide clear, beginner-friendly error messages
-    for invalid paths, dates, or malformed inputs.
-    """
     pass
 
 
 def _raise(msg: str):
-    """
-    Raise a formatted StudentInputError.
-
-    Args:
-        msg (str): Error message to display.
-
-    Raises:
-        StudentInputError: Always raised with a warning prefix.
-    """
     raise StudentInputError("⚠️ " + msg)
 
 
@@ -52,23 +29,6 @@ def _raise(msg: str):
 # ============================================================
 
 def parse_user_date(s: str) -> date:
-    """
-    Parse a user-provided date string into a `datetime.date`.
-
-    Supported formats:
-        - "MM-DD-YYYY"
-        - "YYYY-MM-DD"
-        - "MM/DD/YYYY"
-
-    Args:
-        s (str): Input date string.
-
-    Returns:
-        date: Parsed date object.
-
-    Raises:
-        StudentInputError: If format is invalid.
-    """
     if s is None:
         return None
     s = str(s).strip()
@@ -82,23 +42,6 @@ def parse_user_date(s: str) -> date:
 
 
 def filter_by_date_range(t: Table, start_date=None, end_date=None) -> Table:
-    """
-    Filter a table to an inclusive date range.
-
-    Uses `timestamp_dt` if available, otherwise attempts to parse
-    the `timestamp` column.
-
-    Args:
-        t (Table): Input table.
-        start_date (str | date, optional): Start date.
-        end_date (str | date, optional): End date.
-
-    Returns:
-        Table: Filtered table.
-
-    Raises:
-        StudentInputError: If end_date < start_date.
-    """
     if start_date is None and end_date is None:
         return t
 
@@ -116,15 +59,6 @@ def filter_by_date_range(t: Table, start_date=None, end_date=None) -> Table:
             return t
 
         def _try_dt(ts):
-            """
-            Attempt to parse a timestamp string into a datetime.
-
-            Args:
-                ts (str): Timestamp string.
-
-            Returns:
-                datetime | None: Parsed datetime or None if invalid.
-            """
             if ts is None:
                 return None
             parts = str(ts).split(" ")
@@ -150,16 +84,6 @@ def filter_by_date_range(t: Table, start_date=None, end_date=None) -> Table:
 # ============================================================
 
 def rows_to_table(rows, columns=None) -> Table:
-    """
-    Convert a list of dictionaries into a `datascience.Table`.
-
-    Args:
-        rows (list[dict]): List of row dictionaries.
-        columns (list[str], optional): Explicit column order.
-
-    Returns:
-        Table: Constructed table with consistent columns.
-    """
     if rows is None:
         rows = []
     if columns is None:
@@ -181,51 +105,15 @@ def rows_to_table(rows, columns=None) -> Table:
 # ============================================================
 
 def unix_to_local_dt(unix_ts: int, tz: str) -> datetime:
-    """
-    Convert a Unix timestamp to a timezone-aware datetime.
-
-    Args:
-        unix_ts (int): Unix timestamp.
-        tz (str): Timezone string.
-
-    Returns:
-        datetime: Localized datetime.
-    """
     return datetime.fromtimestamp(int(unix_ts), tz=ZoneInfo(tz))
 
 
 def format_timestamp(dt_local: datetime) -> str:
-    """
-    Format a datetime into a readable timestamp string.
-
-    Args:
-        dt_local (datetime): Local datetime.
-
-    Returns:
-        str: Formatted timestamp string.
-    """
     return dt_local.strftime("%Y-%m-%d %I:%M:%S %p %Z")
 
 
-class EventTable:
-    """
-    Wrapper class for compatibility with older code.
-
-    Attributes:
-        table (Table): Underlying datascience table.
-    """
-    def __init__(self, table: Table):
-        """
-        Initialize the wrapper.
-
-        Args:
-            table (Table): Table to wrap.
-        """
-        self.table = table
-
-
 # ============================================================
-# Instagram parser
+# FIXED INSTAGRAM PARSER
 # ============================================================
 
 def parse_metadata(path: str = "data/instagram_data", tz: str = "America/New_York",
@@ -233,17 +121,11 @@ def parse_metadata(path: str = "data/instagram_data", tz: str = "America/New_Yor
     """
     Parse Instagram export data into a unified events table.
 
-    Args:
-        path (str): Path to Instagram data folder.
-        tz (str): Target timezone.
-        start_date (str | date, optional): Filter start date.
-        end_date (str | date, optional): Filter end date.
-
-    Returns:
-        Table: Parsed Instagram events.
-
-    Raises:
-        StudentInputError: If folder does not exist.
+    Supports:
+        - liked_posts.json
+        - post_comments_1.json
+        - reels_comments.json
+        - story_likes.json
     """
     folder = Path(path)
 
@@ -262,23 +144,89 @@ def parse_metadata(path: str = "data/instagram_data", tz: str = "America/New_Yor
         except Exception:
             continue
 
-        if isinstance(data, dict):
-            if "story_activities_story_likes" in data:
-                for item in data.get("story_activities_story_likes", []):
-                    for entry in item.get("string_list_data", []):
-                        unix_ts = entry.get("timestamp")
-                        if unix_ts:
-                            dt_local = unix_to_local_dt(unix_ts, tz)
-                            rows.append({
-                                "object_type": "story",
-                                "action_type": "like",
-                                "username": item.get("title", ""),
-                                "target": "",
-                                "value": "",
-                                "timestamp_dt": dt_local,
-                                "timestamp": format_timestamp(dt_local),
-                                "timestamp_unix": unix_ts,
-                            })
+        # ----------------------------------------------------
+        # 1. liked_posts.json
+        # ----------------------------------------------------
+        if "likes_media_likes" in data:
+            for item in data["likes_media_likes"]:
+                for entry in item.get("string_list_data", []):
+                    unix_ts = entry.get("timestamp")
+                    if unix_ts:
+                        dt_local = unix_to_local_dt(unix_ts, tz)
+                        rows.append({
+                            "platform": "instagram",
+                            "object_type": "post",
+                            "action_type": "like",
+                            "username": entry.get("value", ""),
+                            "target": item.get("title", ""),
+                            "value": "",
+                            "timestamp_dt": dt_local,
+                            "timestamp": format_timestamp(dt_local),
+                            "timestamp_unix": unix_ts,
+                        })
+
+        # ----------------------------------------------------
+        # 2. post_comments_1.json
+        # ----------------------------------------------------
+        if "comments_media_comments" in data:
+            for item in data["comments_media_comments"]:
+                for entry in item.get("string_list_data", []):
+                    unix_ts = entry.get("timestamp")
+                    if unix_ts:
+                        dt_local = unix_to_local_dt(unix_ts, tz)
+                        rows.append({
+                            "platform": "instagram",
+                            "object_type": "post",
+                            "action_type": "comment",
+                            "username": entry.get("value", ""),
+                            "target": item.get("title", ""),
+                            "value": entry.get("value", ""),
+                            "timestamp_dt": dt_local,
+                            "timestamp": format_timestamp(dt_local),
+                            "timestamp_unix": unix_ts,
+                        })
+
+        # ----------------------------------------------------
+        # 3. reels_comments.json
+        # ----------------------------------------------------
+        if "comments_reels_comments" in data:
+            for item in data["comments_reels_comments"]:
+                for entry in item.get("string_list_data", []):
+                    unix_ts = entry.get("timestamp")
+                    if unix_ts:
+                        dt_local = unix_to_local_dt(unix_ts, tz)
+                        rows.append({
+                            "platform": "instagram",
+                            "object_type": "reel",
+                            "action_type": "comment",
+                            "username": entry.get("value", ""),
+                            "target": item.get("title", ""),
+                            "value": entry.get("value", ""),
+                            "timestamp_dt": dt_local,
+                            "timestamp": format_timestamp(dt_local),
+                            "timestamp_unix": unix_ts,
+                        })
+
+        # ----------------------------------------------------
+        # 4. story_likes.json
+        # ----------------------------------------------------
+        if "story_activities_story_likes" in data:
+            for item in data["story_activities_story_likes"]:
+                for entry in item.get("string_list_data", []):
+                    unix_ts = entry.get("timestamp")
+                    if unix_ts:
+                        dt_local = unix_to_local_dt(unix_ts, tz)
+                        rows.append({
+                            "platform": "instagram",
+                            "object_type": "story",
+                            "action_type": "like",
+                            "username": entry.get("value", ""),
+                            "target": item.get("title", ""),
+                            "value": "",
+                            "timestamp_dt": dt_local,
+                            "timestamp": format_timestamp(dt_local),
+                            "timestamp_unix": unix_ts,
+                        })
 
     base = rows_to_table(rows)
     return filter_by_date_range(base, start_date, end_date)
@@ -289,47 +237,13 @@ def parse_metadata(path: str = "data/instagram_data", tz: str = "America/New_Yor
 # ============================================================
 
 def tiktok_utc_string_to_timestamp(ts_str: str, tz: str) -> str:
-    """
-    Convert a TikTok UTC timestamp string to a localized formatted string.
-
-    Args:
-        ts_str (str): UTC timestamp string ("YYYY-MM-DD HH:MM:SS").
-        tz (str): Target timezone.
-
-    Returns:
-        str: Localized formatted timestamp.
-    """
     dt_utc = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=ZoneInfo("UTC"))
     dt_local = dt_utc.astimezone(ZoneInfo(tz))
     return dt_local.strftime("%Y-%m-%d %I:%M:%S %p %Z")
 
 
 def add_basic_time_columns(t: Table) -> Table:
-    """
-    Add derived time columns to a table.
-
-    Adds:
-        - timestamp_dt
-        - hour
-        - weekday
-        - date
-
-    Args:
-        t (Table): Input table.
-
-    Returns:
-        Table: Table with additional columns.
-    """
     def to_dt(ts):
-        """
-        Convert timestamp string to datetime.
-
-        Args:
-            ts (str): Timestamp string.
-
-        Returns:
-            datetime | None: Parsed datetime or None.
-        """
         if ts is None:
             return None
         ts_no_tz = " ".join(str(ts).split(" ")[:-1])
@@ -360,21 +274,7 @@ def add_basic_time_columns(t: Table) -> Table:
 def tiktok_events(json_path: str = "data/tiktok_data/user_data_tiktok.json",
                  tz: str = "America/New_York",
                  start_date=None, end_date=None) -> Table:
-    """
-    Parse TikTok user data into a structured events table.
 
-    Args:
-        json_path (str): Path to TikTok JSON file.
-        tz (str): Target timezone.
-        start_date (str | date, optional): Filter start date.
-        end_date (str | date, optional): Filter end date.
-
-    Returns:
-        Table: Parsed TikTok events.
-
-    Raises:
-        StudentInputError: If file is not found.
-    """
     path = Path(json_path)
     if not path.exists():
         _raise(f"TikTok file not found: {path}")
@@ -386,16 +286,6 @@ def tiktok_events(json_path: str = "data/tiktok_data/user_data_tiktok.json",
     username = "self"
 
     def add(object_type, action_type, ts_str, target="", value=""):
-        """
-        Add a formatted event row.
-
-        Args:
-            object_type (str): Type of object.
-            action_type (str): Action performed.
-            ts_str (str): Timestamp string.
-            target (str): Target content.
-            value (str): Additional value.
-        """
         if not ts_str:
             return
         try:
@@ -423,76 +313,12 @@ def tiktok_events(json_path: str = "data/tiktok_data/user_data_tiktok.json",
 
 
 # ============================================================
-# Analysis helpers
-# ============================================================
-
-def events_by_hour(t: Table) -> Table:
-    """
-    Group events by hour.
-
-    Args:
-        t (Table): Input table.
-
-    Returns:
-        Table: Count of events by hour.
-    """
-    if "hour" not in t.labels:
-        t = add_basic_time_columns(t)
-    return t.group("hour").sort("count", descending=True)
-
-
-def events_by_weekday(t: Table) -> Table:
-    """
-    Group events by weekday.
-
-    Args:
-        t (Table): Input table.
-
-    Returns:
-        Table: Count of events by weekday.
-    """
-    if "weekday" not in t.labels:
-        t = add_basic_time_columns(t)
-    return t.group("weekday").sort("count", descending=True)
-
-
-def events_by_date(t: Table) -> Table:
-    """
-    Group events by date.
-
-    Args:
-        t (Table): Input table.
-
-    Returns:
-        Table: Count of events by date.
-    """
-    if "date" not in t.labels:
-        t = add_basic_time_columns(t)
-    return t.group("date").sort("date")
-
-
-# ============================================================
 # Combined
 # ============================================================
 
 def social_media_events(instagram_folder=None, tiktok_json=None,
                         tz="America/New_York", start_date=None, end_date=None) -> Table:
-    """
-    Build a combined social media events table.
 
-    Args:
-        instagram_folder (str | None): Instagram data path.
-        tiktok_json (str | None): TikTok JSON path.
-        tz (str): Target timezone.
-        start_date (str | date, optional): Filter start date.
-        end_date (str | date, optional): Filter end date.
-
-    Returns:
-        Table: Combined dataset.
-
-    Raises:
-        StudentInputError: If no data sources are found.
-    """
     parts = []
 
     if instagram_folder and Path(instagram_folder).exists():
