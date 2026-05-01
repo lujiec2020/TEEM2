@@ -317,21 +317,59 @@ def tiktok_events(json_path: str = "data/tiktok_data/user_data_tiktok.json",
 # ============================================================
 
 def social_media_events(instagram_folder=None, tiktok_json=None,
-                        tz="America/New_York", start_date=None, end_date=None) -> Table:
+                        tz="America/New_York", start_date=None, end_date=None):
+    """
+    Load Instagram and/or TikTok events and return a combined table.
+
+    Args:
+        instagram_folder (str | None): Path to Instagram data folder.
+        tiktok_json (str | None): Path to TikTok JSON file.
+        tz (str): Timezone for timestamp conversion.
+        start_date (str | date | None): Optional filter start date.
+        end_date (str | date | None): Optional filter end date.
+
+    Returns:
+        Table: Combined datascience Table of events.
+    """
 
     parts = []
 
+    # Instagram
     if instagram_folder and Path(instagram_folder).exists():
-        parts.append(parse_metadata(instagram_folder, tz, start_date, end_date))
+        try:
+            ig = parse_metadata(instagram_folder, tz, start_date, end_date)
+            parts.append(ig)
+        except Exception as e:
+            raise StudentInputError(f"Error loading Instagram data: {e}")
 
+    # TikTok
     if tiktok_json and Path(tiktok_json).exists():
-        parts.append(tiktok_events(tiktok_json, tz, start_date, end_date))
+        try:
+            tt = tiktok_events(tiktok_json, tz, start_date, end_date)
+            parts.append(tt)
+        except Exception as e:
+            raise StudentInputError(f"Error loading TikTok data: {e}")
 
     if not parts:
-        _raise("No data found.")
+        raise StudentInputError("No valid Instagram or TikTok data found.")
 
+    # Start with the first table
     combined = parts[0]
+
+    # Append the rest, aligning columns each time
     for p in parts[1:]:
+
+        # Add missing columns to p
+        for col in combined.labels:
+            if col not in p.labels:
+                p = p.with_column(col, [""] * p.num_rows)
+
+        # Add missing columns to combined
+        for col in p.labels:
+            if col not in combined.labels:
+                combined = combined.with_column(col, [""] * combined.num_rows)
+
+        # Now safe to append
         combined = combined.append(p)
 
     return combined
