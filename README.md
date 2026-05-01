@@ -1,4 +1,4 @@
-## Social Media Data Parser
+# Social Media Data Parser
 This project converts raw Instagram and TikTok data exports into a unified, structured event dataset for analysis.
 
 It standardizes both platforms into a consistent schema so users can:
@@ -7,21 +7,35 @@ It standardizes both platforms into a consistent schema so users can:
 - analyze usage over time
 - compare behavioral trends across platforms
 
-All outputs are returned as datascience.Table objects.
+All outputs are returned as `datascience.Table` objects.
 
 ## Installation
 Install Python 3.9+ or ensure it is already installed
 
 Install the package directly from GitHub:
 ```
-pip install git+https://github.com/<your-username>/<your-repo-name>.git
+pip install git+https://github.com/lujiec2020/TEEM2.git
 ```
 Install Dependencies 
 ```
 pip install datascience
 pip install pytz
 ```
-### Run the Parser
+## Input Data
+This project uses official data exports:
+
+- Instagram export (JSON files inside a folder) 
+
+- TikTok export (user_data_tiktok.json)
+
+- Place them in:
+```
+data/
+ ├── instagram_data/
+ └── tiktok_data/
+      └── user_data_tiktok.json
+```
+### Quick Start
 ```
 from social_media_functions.parse_metadata import social_media_events
 
@@ -32,22 +46,10 @@ t = social_media_events(
 
 t.show(5)
 ```
-## Input Data
-This project uses official data exports:
 
--Instagram export (JSON files inside a folder) 
+## Main Functions
 
--TikTok export (user_data_tiktok.json)
-
-- Place them in:
-```
-data/
- ├── instagram_data/
- └── tiktok_data/
-      └── user_data_tiktok.json
-```
-## How to Use Each Function
-### parse_metadata()
+### `parse_metadata()`
 Parses Instagram export data into a structured event table.
 ```
 from social_media_functions.parse_metadata import parse_metadata
@@ -59,7 +61,8 @@ ig.show(5)
 Output: Table of Instagram activity (e.g., story likes, interactions, timestamps).
 
 <img width="664" height="389" alt="Screenshot 2026-05-01 at 1 32 42 AM" src="https://github.com/user-attachments/assets/034529a5-5118-4d52-9582-15672697697a" />
-### tiktok_events()
+
+### `tiktok_events()`
 Parses TikTok JSON export into structured events.
 
 ```
@@ -73,7 +76,7 @@ Output: Table of TikTok activity (e.g., watch history and engagement events with
 <img width="661" height="384" alt="Screenshot 2026-05-01 at 1 33 55 AM" src="https://github.com/user-attachments/assets/e317f89f-3c8c-4161-9513-ab8d9e74de27" />
 
 
-### Load Both Platforms Together
+### `social_media_events()`
 
 ```
 from social_media_functions.parse_metadata import social_media_events
@@ -88,6 +91,64 @@ t.show(5)
 Output: Combined table of Instagram and TikTok events in a unified format.
 
 <img width="671" height="391" alt="Screenshot 2026-05-01 at 1 31 51 AM" src="https://github.com/user-attachments/assets/e4cd5fbd-af86-49d5-bf97-d444724c3830" />
+
+## Optional Parameters
+All three functions (parse_metadata, tiktok_events, social_media_events) support the following:
+
+### Date Filtering
+```
+start_date="04-24-2025"
+end_date="04-30-2025"
+```
+Supported Formats Include: 
+- "MM-DD-YYYY"
+- "YYYY-MM-DD"
+- "MM/DD/YYYY"
+
+Example: 
+```
+t = social_media_events(
+    instagram_folder="data/instagram_data",
+    tiktok_json="data/tiktok_data/user_data_tiktok.json",
+    start_date="04-24-2025",
+    end_date="04-30-2025"
+)
+```
+
+### Timezone (tz)
+All functions accept a timezone parameter:
+```
+tz="America/New_York"  # default
+```
+Example: 
+```
+ t = social_media_events(
+    instagram_folder="data/instagram_data",
+    tiktok_json="data/tiktok_data/user_data_tiktok.json",
+    tz="America/Los_Angeles"
+)
+```
+## EventTable Utilities (time_features.py)
+### `hide(*cols)`
+- Removes specified columns from the table.
+```
+t.hide("timestamp_unix", "relative_day_index")
+```
+
+### `get_time_conversions(features)`
+Adds derived time-based columns.
+Supported features:
+- "hour"
+- "weekday"
+- "month"
+- "year"
+- "date"
+
+Example: 
+```
+t = t.get_time_conversions(["hour", "weekday"])
+t.show(5)
+```
 
 ## Analysis Functions
 
@@ -158,9 +219,13 @@ Output: Table showing activity frequency by hour of the day.
 
 
 
-Creators: Amreen Adams and Giancarlos Aviles
+## Creators
 
-Questions? Reach out: AD70738@umbc.edu, gaviles1@umbc.edu
+Amreen Adams and Giancarlos Aviles
+
+Questions? Reach out:  
+AD70738@umbc.edu  
+gaviles1@umbc.edu
 
 
 
