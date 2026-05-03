@@ -144,11 +144,28 @@ Supported features:
 - "year"
 - "date"
 
+Wrap Table: 
+```
+from social_media_functions.parse_metadata.time_features import EventTable
+et = EventTable(t)
+
+```
+Output: 
+<img width="1045" height="234" alt="Screenshot 2026-05-02 at 10 46 32 PM" src="https://github.com/user-attachments/assets/77e7646b-0742-4b9a-a3d4-d2b9d2e15354" />
+
+Add Time-based Features
+```
+et_time = et.get_time_conversions(["hour", "weekday", "date"])
+et_time.table.show(5)
+```
 Example: 
 ```
-t = t.get_time_conversions(["hour", "weekday"])
-t.show(5)
+events_by_weekday = et_time.table.group("weekday").sort("weekday")
+events_by_weekday.show()
 ```
+Output:
+<img width="166" height="192" alt="Screenshot 2026-05-02 at 10 47 18 PM" src="https://github.com/user-attachments/assets/831f8027-5719-4096-80da-34441b927e61" />
+
 
 ## Analysis Functions
 
