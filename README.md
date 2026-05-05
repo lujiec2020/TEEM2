@@ -14,12 +14,12 @@ Install Python 3.9+ or ensure it is already installed
 
 Install the package directly from GitHub:
 ```
-pip install git+https://github.com/lujiec2020/TEEM2.git
+!pip install git+https://github.com/lujiec2020/TEEM2.git
 ```
 Install Dependencies 
 ```
-pip install datascience
-pip install pytz
+!pip install datascience
+!pip install pytz
 ```
 ## Input Data
 This project uses official data exports:
