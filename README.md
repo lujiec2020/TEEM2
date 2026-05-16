@@ -41,7 +41,7 @@ data/
 ```
 ### Platform‑Specific File Detection 
 
-The parser identifies Instagram and TikTok files based on their internal JSON keys, not their filenames or folder names.
+⚠️ Warning: TikTok files won’t show up if you put them in the Instagram folder. This is because TikTok and Instagram use different types of JSON files. Please make sure each platform’s data is stored in the correct location as shown above.
 
 To load TikTok data, you must pass it to the tiktok_events() or social_media_events() function via the tiktok_json argument.
 
