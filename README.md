@@ -22,18 +22,22 @@ Install Dependencies
 !pip install pytz
 ```
 ## Input Data
-This project uses official data exports:
+This project uses data that follows the same internal structure as the official Instagram and TikTok exports.
 
-- Instagram export (JSON files inside a folder) 
+You may rename the folders or files however you want — the parser only requires that the JSON contents follow the official export format, not the original filenames.
 
-- TikTok export (user_data_tiktok.json)
+Supported inputs:
 
-- Place them in:
+Instagram export (a folder containing the Instagram JSON files)
+
+TikTok export (a JSON file matching the structure of user_data_tiktok.json)
+
+Example directory layout (names are flexible):
 ```
 data/
- ├── instagram_data/
- └── tiktok_data/
-      └── user_data_tiktok.json
+ ├── instagram_data/        # folder name can be anything
+ └── tiktok_data/           # folder name can be anything
+      └── user_data.json    # file name can be anything
 ```
 ### Quick Start
 ```
