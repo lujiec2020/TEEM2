@@ -53,7 +53,7 @@ Supported inputs:
 
 - TikTok export (a JSON file matching the structure of user_data_tiktok.json)
 
-Please make sure your files follow this structure — if TikTok data is placed in the Instagram folder, the parser will print a warning and skip it:
+⚠️Please make sure your files follow this structure — if TikTok data is placed in the Instagram folder, the parser will print a warning and skip it:
 
 ```
 data/
@@ -64,13 +64,6 @@ data/
  │    └── story_likes.json
  └── tiktok_data/
       └── user_data_tiktok.json
-```
-
-⚠️ **Placing a TikTok file inside the Instagram folder will print this warning and skip the file:**
-```
-Warning: 'user_data.json' looks like a TikTok export file, not an Instagram file.
-Move it out of the Instagram folder and pass it via tiktok_json= instead.
-This file will be skipped.
 ```
 ## social_media_events() — Unified Event Loader
 
