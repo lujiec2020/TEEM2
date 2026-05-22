@@ -35,6 +35,12 @@ def _raise(msg: str):
     raise StudentInputError("⚠️ " + msg)
 
 
+_TIKTOK_KEYS = {"Your Activity", "Likes and Favorites", "Profile", "Comment", "Direct Messages"}
+
+def _is_tiktok_file(data: dict) -> bool:
+    return bool(_TIKTOK_KEYS & set(data.keys()))
+
+
 # ============================================================
 # Date parsing + range filtering
 # ============================================================
@@ -161,6 +167,12 @@ def add_basic_time_columns(t: Table) -> Table:
     if "weekday" not in t.labels and "timestamp_dt" in t.labels:
         t = t.with_column("weekday", t.apply(lambda d: d.strftime("%A") if d else None, "timestamp_dt"))
 
+    if "month" not in t.labels and "timestamp_dt" in t.labels:
+        t = t.with_column("month", t.apply(lambda d: d.month if d else None, "timestamp_dt"))
+
+    if "year" not in t.labels and "timestamp_dt" in t.labels:
+        t = t.with_column("year", t.apply(lambda d: d.year if d else None, "timestamp_dt"))
+
     if "date" not in t.labels and "timestamp_dt" in t.labels:
         t = t.with_column("date", t.apply(lambda d: d.date() if d else None, "timestamp_dt"))
 
@@ -232,6 +244,14 @@ def parse_metadata(
             continue
 
         if not isinstance(data, dict):
+            continue
+
+        if _is_tiktok_file(data):
+            print(
+                f"⚠️  Warning: '{fp.name}' looks like a TikTok export file, not an Instagram file.\n"
+                f"   Move it out of the Instagram folder and pass it via tiktok_json= instead.\n"
+                f"   This file will be skipped."
+            )
             continue
 
         # liked_posts.json (common IG export key)
