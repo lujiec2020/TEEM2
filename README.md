@@ -41,7 +41,7 @@ Install Dependencies
 !pip install pytz
 ```
 ## Input Data
-This package parses official data exports from Instagram and TikTok. File and folder names are flexible — the parser identifies data by JSON content, not by filename.
+This package parses official data exports from Instagram and TikTok. File and folder names are flexible; the parser identifies data by JSON content, not by filename.
 
 > **How to export your data:**
 > - **Instagram** — Settings → Your activity → Download your information
