@@ -1,5 +1,3 @@
-# Social Media Data Parser
-
 <p align="center">
   <img src="Package_logo.png" alt="Social Media Data Parser Logo" width="100%"/>
 </p>
