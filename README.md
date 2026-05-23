@@ -96,7 +96,7 @@ social_media_events(
 | `tz` | `str` | `"America/New_York"` | Timezone for converting timestamps. Any valid [IANA timezone string](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). |
 
 ### Returns
-A unified datascience.Table with the following standardized columns:
+A datascience.Table combining all parsed events into a single unified schema with the following columns:
 | Column | Description |
 | --- | --- |
 | ``platform`` | ``"instagram"`` or ``"tiktok"`` |
@@ -106,7 +106,11 @@ A unified datascience.Table with the following standardized columns:
 | ``timestamp_dt`` | Parsed timezone‑aware datetime |
 | ``target`` | Content or user interacted with |
 | ``value`` | Additional metadata |
-| ``hour``, ``weekday``, ``month``, ``year``, ``date`` | Derived time features |
+| ``hour`` | Hour of day the event occurred (0–23) |
+| ``weekday`` | Day of the week (e.g., `"Monday"`) |
+| ``month`` | Month number (1–12) |
+| ``year`` | Year (e.g., `2024`) |
+| ``date`` | Date only, without time (e.g., `2024-03-15`) |
 
 
 
