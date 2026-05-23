@@ -41,11 +41,6 @@ Install Dependencies
 !pip install pytz
 ```
 ## Input Data
-This package parses official data exports from Instagram and TikTok. File and folder names are flexible; the parser identifies data by JSON content, not by filename.
-
-> **How to export your data:**
-> - **Instagram** — Settings → Your activity → Download your information
-> - **TikTok** — Settings → Account → Download your data
 
 Supported inputs:
 
@@ -65,6 +60,9 @@ data/
  └── tiktok_data/
       └── user_data_tiktok.json
 ```
+> **How to export your data:**
+> - **Instagram** — Settings → Your activity → Download your information
+> - **TikTok** — Settings → Account → Download your data
 ## social_media_events() — Unified Event Loader
 
 Parses Instagram and TikTok exports, standardizes them into a unified schema, applies optional date filtering and timezone conversion, and returns a combined datascience.Table of all events.
