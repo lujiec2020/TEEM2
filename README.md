@@ -27,7 +27,7 @@ All outputs are returned as [`datascience.Table`](https://datascience.readthedoc
   - [Count Events by Object Type](#count-events-by-object-type-posts-reels-videos-etc)
   - [Select Only Certain Columns](#select-only-certain-columns)
   - [Count by Hour](#count-by-hour)
-- [Creators](#creators)
+- [Credit](#credit)
 
 ## Installation
 Install Python 3.9+ or ensure it is already installed
@@ -164,7 +164,7 @@ Output: Table showing activity frequency by hour of the day.
 
 <img width="98" height="242" alt="Screenshot 2026-05-01 at 2 35 10 AM" src="https://github.com/user-attachments/assets/2a5ef64b-2214-4410-9ed3-1495fb12def2" />
 
-## Creators
+## Credit
 This package was authored by  Amreen Adams and Giancarlos Aviles, advised by Supakit Boonsongprasert
 
 
