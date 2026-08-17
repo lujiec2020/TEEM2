@@ -16,6 +16,7 @@ All outputs are returned as [`datascience.Table`](https://datascience.readthedoc
 
 ## Table of Contents
 - [Installation](#installation)
+- [How To Export Your Data](#how-to-export-your-data)
 - [Input Data](#input-data)
 - [social_media_events()](#social_media_events--unified-event-loader)
   - [Parameters](#parameters)
