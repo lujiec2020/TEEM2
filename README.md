@@ -43,7 +43,7 @@ Install Dependencies
 ```
 ## How to export your data
 - **Instagram**
-  - Settings → Meta) Accounts Center →  Your information and permissions → Export your information → Create export → Select Export to device →
+  - Settings → Meta Accounts Center →  Your information and permissions → Export your information → Create export → Select Export to device →
 Confirm your export ( Please make sure to change Format to **JSON**)
 - **TikTok**
   - **[On Mobile]** tap the three-line menu in the top-right corner → Settings and privacy → Account → Download your data → Change format to **JSON** →  Request data
