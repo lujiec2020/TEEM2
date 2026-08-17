@@ -17,7 +17,7 @@ All outputs are returned as [`datascience.Table`](https://datascience.readthedoc
 ## Table of Contents
 - [Installation](#installation)
 - [Input Data](#input-data)
-- [social_media_events()](#social_media_events----unified-event-loader)
+- [social_media_events()](#social_media_events()--unified-event-loader)
   - [Parameters](#parameters)
   - [Returns](#returns)
 - [Quick Start](#quick-start)
@@ -63,6 +63,7 @@ data/
 > **How to export your data:**
 > - **Instagram** — Settings → Your activity → Download your information
 > - **TikTok** — Settings → Account → Download your data
+
 ## social_media_events() — Unified Event Loader
 
 Parses Instagram and TikTok exports, standardizes them into a unified schema, applies optional date filtering and timezone conversion, and returns a combined datascience.Table of all events.
