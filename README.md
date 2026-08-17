@@ -165,8 +165,8 @@ Output: Table showing activity frequency by hour of the day.
 <img width="98" height="242" alt="Screenshot 2026-05-01 at 2 35 10 AM" src="https://github.com/user-attachments/assets/2a5ef64b-2214-4410-9ed3-1495fb12def2" />
 
 ## Creators
+This package was authored by  Amreen Adams and Giancarlos Aviles, advised by Supakit Boonsongprasert
 
-Amreen Adams and Giancarlos Aviles
 
 Questions? Reach out:  
 AD70738@umbc.edu  
