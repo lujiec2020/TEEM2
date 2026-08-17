@@ -17,7 +17,7 @@ All outputs are returned as [`datascience.Table`](https://datascience.readthedoc
 ## Table of Contents
 - [Installation](#installation)
 - [Input Data](#input-data)
-- [social_media_events()](#social_media_events()--unified-event-loader)
+- [social_media_events()](#social_media_events--unified-event-loader)
   - [Parameters](#parameters)
   - [Returns](#returns)
 - [Quick Start](#quick-start)
@@ -40,29 +40,36 @@ Install Dependencies
 !pip install datascience
 !pip install pytz
 ```
+## How to export your data
+- **Instagram**
+  - Settings → Meta) Accounts Center →  Your information and permissions → Export your information → Create export → Select Export to device →
+Confirm your export ( Please make sure to change Format to **JSON**)
+- **TikTok**
+  - **[On Mobile]** tap the three-line menu in the top-right corner → Settings and privacy → Account → Download your data → Change format to **JSON** →  Request data
+  - **[On Laptop]** tap the three-dot menu in the left panel (under Profile) → General → Manage account  → → Change format to **JSON** →  Request data
+
+
 ## Input Data
 
 Supported inputs:
 
 - Instagram export (a folder containing the Instagram JSON files)
-
 - TikTok export (a JSON file matching the structure of user_data_tiktok.json)
 
-⚠️Please make sure your files follow this structure — if TikTok data is placed in the Instagram folder, the parser will print a warning and skip it:
+⚠️After you receive the data by following the instructions in **"How to export your data"**. **Please create a folder and put the data in the same name and structure as below**
+
+⚠️If TikTok data is placed in the Instagram folder, the parser will print a warning and skip it:
 
 ```
 data/
  ├── instagram_data/
- │    ├── liked_posts.json
- │    ├── post_comments_1.json
- │    ├── reels_comments.json
- │    └── story_likes.json
+ │    ├── liked_posts.json # download likes folder 
+ │    ├── post_comments_1.json # download from comments folder
+ │    ├── reels_comments.json # download from comments folder
+ │    └── story_likes.json# download from story_interactions folder
  └── tiktok_data/
       └── user_data_tiktok.json
 ```
-> **How to export your data:**
-> - **Instagram** — Settings → Your activity → Download your information
-> - **TikTok** — Settings → Account → Download your data
 
 ## social_media_events() — Unified Event Loader
 
